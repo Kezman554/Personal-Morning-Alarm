@@ -1,0 +1,13 @@
+2026-05-03  Initial Android project scaffold
+  - Created module layout: data/, ui/, service/, receiver/, challenge/, util/
+  - Build setup: AGP 8.7.3, Kotlin 1.9.25, Gradle 8.9, KSP for Room
+  - compileSdk 36, targetSdk 34, minSdk 26 (Galaxy A32 5G is API 30)
+  - Dependencies: Room, CameraX, ML Kit barcode, Material3, Navigation, Lifecycle/ViewModel
+  - Manifest permissions: NFC, CAMERA, FLASHLIGHT, VIBRATE, WAKE_LOCK,
+    SCHEDULE_EXACT_ALARM, USE_EXACT_ALARM, RECEIVE_BOOT_COMPLETED,
+    POST_NOTIFICATIONS, FOREGROUND_SERVICE (+ media playback / special use)
+  - Placeholder MainActivity shows app name via view binding
+  - Built debug APK successfully (~29 MB; over PRD's 20 MB target -
+    revisit by switching ML Kit barcode to Play Services unbundled variant)
+  - Git initialised, origin set to Kezman554/Personal-Morning-Alarm (not pushed)
+  - Install on device deferred: no device attached over ADB during scaffold
