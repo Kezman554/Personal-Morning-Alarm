@@ -11,3 +11,9 @@
     revisit by switching ML Kit barcode to Play Services unbundled variant)
   - Git initialised, origin set to Kezman554/Personal-Morning-Alarm (not pushed)
   - Install on device deferred: no device attached over ADB during scaffold
+
+2026-06-03  Build fix: compileSdk 36 to 35 (commit 8dadebc, pushed)
+  - app/build.gradle: compileSdk 36 became compileSdk 35
+  - Why: AGP 8.7.3 only supports compiling up to SDK 35; targeting 36 was
+    asking it to build against a platform it doesn't understand, choking the sync
+  - targetSdk (34) and minSdk (26) unchanged
