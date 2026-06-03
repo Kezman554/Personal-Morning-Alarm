@@ -71,3 +71,26 @@
   - END-TO-END VERIFIED on device: tapped button 19:17:16 -> "Alarm scheduled
     for ...696" -> receiver logged "Alarm fired at 2026-06-03 19:18:16" (exactly
     on the 60s mark)
+
+2026-06-03  Alarm service + dismissal activity
+  - service/AlarmService: foreground service (type mediaPlayback), HIGH-importance
+    notification channel "alarm_channel" (sound/vibration handled by service, not
+    channel; bypasses DND). Looping MediaPlayer on default TYPE_ALARM ringtone
+    with USAGE_ALARM attrs; repeating waveform vibration. start()/stop() helpers,
+    isRunning flag
+  - ui/AlarmDismissalActivity: setShowWhenLocked/setTurnScreenOn + requestDismiss
+    Keyguard (window FLAG_* fallback < API 27). Back button swallowed via
+    OnBackPressedCallback. Temporary "Stop alarm" button (deviation from "empty"
+    so the looping alarm can be stopped without force-stop; marked TODO)
+  - AlarmReceiver now starts AlarmService (exact-alarm FGS exemption)
+  - Activity launched via full-screen-intent notification (reliable bg activity
+    start on API 29+), not raw startActivity
+  - Manifest: registered service + activity (showOnLockScreen, turnScreenOn,
+    singleTask, excludeFromRecents); added USE_FULL_SCREEN_INTENT
+  - NOTE: on API 33 the FSI needs POST_NOTIFICATIONS granted; granted via adb for
+    testing. In-app runtime request still TODO
+  - VERIFIED on device (driven via adb, screen asleep/Dozing): alarm fired ->
+    AlarmService foreground (isForeground=true, id 2001) -> screen Dozing->Awake
+    -> AlarmDismissalActivity became focused window over lock screen -> on-screen
+    Stop button logged "AlarmService stopping" and the service record cleared.
+  - Human-confirmed by Nick: screen slept, then the alarm sounded WITH vibration

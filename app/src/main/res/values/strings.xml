@@ -7,6 +7,14 @@
     <string name="title_statistics">Statistics</string>
     <string name="title_settings">Settings</string>
 
+    <!-- Alarm service + dismissal -->
+    <string name="alarm_channel_name">Alarm</string>
+    <string name="alarm_channel_description">Plays the morning alarm</string>
+    <string name="alarm_notification_title">Wake up</string>
+    <string name="alarm_notification_text">Tap to dismiss the alarm</string>
+    <string name="alarm_dismissal_title">Wake up</string>
+
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
+    <string name="stop_alarm_temp">Stop alarm (temp)</string>
 </resources>

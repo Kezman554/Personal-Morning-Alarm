@@ -18,6 +18,8 @@
 
     <!-- Notifications (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Launch the dismissal activity over the lock screen from the alarm service -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- Foreground services for alarm + countdown reliability -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -47,6 +49,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.AlarmDismissalActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true" />
+
+        <service
+            android:name=".service.AlarmService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <receiver
             android:name=".receiver.AlarmReceiver"
