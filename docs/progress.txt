@@ -110,3 +110,21 @@
     dumpsys alarm showed the pending alarm at 2026-06-04 06:30:00 (next
     occurrence of the saved 06:30 config). Note: Samsung staggers boot
     broadcasts — ours arrived ~4 min after sys.boot_completed=1
+
+2026-06-03  Shake challenge (Stage 1) + dismissal wiring
+  - challenge/ChallengeInterface: start()/stop() + onProgress(Float 0..1)/
+    onComplete callbacks (settable lambdas). Common contract for all challenges
+  - challenge/ShakeChallenge: TYPE_ACCELEROMETER via SensorManager; "shaking" =
+    delta of acceleration magnitude > 15.0f (gravity cancels in the delta, so
+    orientation-independent). Accrues cumulative active-shake time toward 15s
+    target with a 300ms pause tolerance; auto-stops + fires onComplete at 100%.
+    threshold + target are constructor params (defaulted)
+  - ui/AlarmDismissalActivity: wired ShakeChallenge in — progress bar + percent,
+    starts in onResume / stops in onPause. onComplete stops AlarmService +
+    finishes. Replaced temp Stop button with shake-to-dismiss but KEPT a fallback
+    Stop button (TODO) while tuning
+  - VERIFIED on device (full alarm path, Nick shaking): 0% -> 25 -> 50 -> 75 ->
+    100% -> "Shake challenge complete" -> AlarmService stopped. Bar filled, alarm
+    stopped. Feedback: needed a VERY hard shake (sat at 0% ~45s before catching);
+    15.0f threshold is stiff. Keeping as-is for now; future Settings option to
+    tune shake vigour planned (maps to ShakeChallenge shakeThreshold arg)

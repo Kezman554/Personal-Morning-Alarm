@@ -13,6 +13,8 @@
     <string name="alarm_notification_title">Wake up</string>
     <string name="alarm_notification_text">Tap to dismiss the alarm</string>
     <string name="alarm_dismissal_title">Wake up</string>
+    <string name="shake_instruction">Shake hard to wake up</string>
+    <string name="shake_progress_format">%1$d%%</string>
 
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
