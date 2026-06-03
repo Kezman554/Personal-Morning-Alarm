@@ -128,3 +128,24 @@
     stopped. Feedback: needed a VERY hard shake (sat at 0% ~45s before catching);
     15.0f threshold is stiff. Keeping as-is for now; future Settings option to
     tune shake vigour planned (maps to ShakeChallenge shakeThreshold arg)
+
+2026-06-03  Stage 1 full UI + Stage 2 handoff (+ shake tuning)
+  - AlarmDismissalActivity: progress bar, seconds-remaining, red->green
+    background (ArgbEvaluator), haptic pulses while actively shaking. On
+    complete: stops AlarmService, logs Stage 1 success to DB, brief success
+    message, then transitions to Stage 2 (blue) and starts the countdown
+  - service/CountdownService: foreground (specialUse), runs Stage 2 timer from
+    config stage2DurationMinutes, exposes remainingSeconds StateFlow + ticking
+    notification. Nuclear-on-expiry still TODO. Registered in manifest
+  - Stage 1 success persisted via AlarmRepository (upsert today's AlarmEvent)
+  - SHAKE TUNING (3 on-device rounds with Nick): threshold 15->8->4.0f; 15 and 8
+    impractically hard (~11% of vigorous shaking counted at 8). Fixed a real bug:
+    progress reset when switching arms — rotation was recreating the activity and
+    onResume re-zeroed progress. Now orientation-locked (nosensor), KEEP_SCREEN_ON,
+    and start() preserves accumulated progress; pause tolerance 300->500ms
+  - VERIFIED on device: shake filled 0->100% (no reset), alarm stopped, "Stage 1
+    success logged", CountdownService started (600s), blue Stage 2 countdown shown
+  - KNOWN follow-up (Nick deferred): detection favours fast twitches over big
+    swings (delta-of-samples = frequency detector). Switch to accel-magnitude
+    deviation from gravity so forceful swings register too; bundle with the
+    planned sensitivity setting

@@ -55,6 +55,7 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
+            android:screenOrientation="nosensor"
             android:showOnLockScreen="true"
             android:turnScreenOn="true" />
 
@@ -62,6 +63,15 @@
             android:name=".service.AlarmService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".service.CountdownService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="stage2_countdown" />
+        </service>
 
         <receiver
             android:name=".receiver.AlarmReceiver"

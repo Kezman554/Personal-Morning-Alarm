@@ -2,16 +2,20 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="24dp">
 
     <TextView
-        android:id="@+id/dismissal_title"
+        android:id="@+id/tv_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/shake_instruction"
         android:textAppearance="?attr/textAppearanceHeadlineLarge"
+        android:textColor="@android:color/white"
+        android:gravity="center"
         app:layout_constraintBottom_toTopOf="@id/shake_progress"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -28,26 +32,40 @@
         android:progress="0"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/dismissal_title" />
+        app:layout_constraintTop_toBottomOf="@id/tv_title" />
 
     <TextView
-        android:id="@+id/shake_status"
+        android:id="@+id/tv_seconds"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="@string/shake_progress_format"
         android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:textColor="@android:color/white"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/shake_progress" />
 
-    <!-- TODO(temporary): fallback so a mistuned threshold can't trap a blaring alarm. -->
+    <!-- Stage 2 countdown (hidden until Stage 1 completes) -->
+    <TextView
+        android:id="@+id/tv_countdown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/white"
+        android:textSize="64sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_title"
+        tools:text="9:58" />
+
+    <!-- TODO(temporary): abort while tuning; lets us end Stage 1/2 during testing. -->
     <Button
         android:id="@+id/btn_stop_alarm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/stop_alarm_temp"
+        android:text="@string/abort_temp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />

@@ -15,8 +15,17 @@
     <string name="alarm_dismissal_title">Wake up</string>
     <string name="shake_instruction">Shake hard to wake up</string>
     <string name="shake_progress_format">%1$d%%</string>
+    <string name="seconds_format">%1$ds</string>
+    <string name="stage1_success">Nice — you\'re up!</string>
+    <string name="stage2_title">Stage 2 — get moving</string>
+
+    <!-- Stage 2 countdown service -->
+    <string name="countdown_channel_name">Stage 2 countdown</string>
+    <string name="countdown_channel_description">Shows the Stage 2 time remaining</string>
+    <string name="countdown_notification_title">Stage 2 in progress</string>
 
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
     <string name="stop_alarm_temp">Stop alarm (temp)</string>
+    <string name="abort_temp">Abort (temp)</string>
 </resources>

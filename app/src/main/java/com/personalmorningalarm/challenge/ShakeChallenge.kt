@@ -45,23 +45,28 @@ class ShakeChallenge(
             Log.w(TAG, "No accelerometer available; ShakeChallenge cannot run")
             return
         }
-        resetState()
+        // Re-baseline timing only — accumulated progress is preserved across
+        // stop/start so a pause (e.g. switching shaking arms) doesn't lose it.
+        lastSampleTime = 0L
+        lastMagnitude = 0f
+        lastShakeTime = 0L
         running = true
         sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+    }
+
+    /** Clears accumulated progress so the challenge can run from scratch. */
+    fun reset() {
+        completed = false
+        lastMagnitude = 0f
+        lastSampleTime = 0L
+        lastShakeTime = 0L
+        accumulatedShakeMs = 0L
     }
 
     override fun stop() {
         if (!running) return
         running = false
         sensorManager.unregisterListener(this)
-    }
-
-    private fun resetState() {
-        completed = false
-        lastMagnitude = 0f
-        lastSampleTime = 0L
-        lastShakeTime = 0L
-        accumulatedShakeMs = 0L
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -111,11 +116,18 @@ class ShakeChallenge(
     companion object {
         private const val TAG = "PMA"
 
-        const val DEFAULT_SHAKE_THRESHOLD = 15.0f
+        // Tuned down across on-device tests: 15.0f then 8.0f both needed
+        // near-maximal effort (only ~11% of vigorous shaking counted at 8.0f).
+        // 4.0f registers a comfortable shake; raise if it becomes too easy.
+        const val DEFAULT_SHAKE_THRESHOLD = 4.0f
         const val DEFAULT_TARGET_DURATION_MS = 15_000L
 
-        /** How long after the last strong shake we still count as "shaking". */
-        private const val PAUSE_TOLERANCE_MS = 300L
+        /**
+         * How long after the last strong shake we still count as "shaking".
+         * Wide enough to bridge the low-motion instant between shake reversals
+         * so continuous shaking accrues smoothly.
+         */
+        private const val PAUSE_TOLERANCE_MS = 500L
 
         /** Caps a single interval so a stalled sensor can't jump the timer. */
         private const val MAX_INTERVAL_MS = 100L
