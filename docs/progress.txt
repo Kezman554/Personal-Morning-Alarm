@@ -94,3 +94,19 @@
     -> AlarmDismissalActivity became focused window over lock screen -> on-screen
     Stop button logged "AlarmService stopping" and the service record cleared.
   - Human-confirmed by Nick: screen slept, then the alarm sounded WITH vibration
+
+2026-06-03  Boot persistence
+  - receiver/BootReceiver: on BOOT_COMPLETED, reads current AlarmConfig via
+    AlarmRepository (goAsync + IO coroutine) and, if isEnabled, reschedules
+    through AlarmScheduler. Logs outcome under tag PMA
+  - util/AlarmScheduler: added scheduleDailyAlarm(alarmTimeMinutes) +
+    nextTriggerMillis() — computes next occurrence of a daily wall-clock time
+    (today if still future, else tomorrow) via java.time. Reused later by the
+    real "save alarm" screen
+  - Manifest: registered BootReceiver (exported=true, intent-filter
+    BOOT_COMPLETED). RECEIVE_BOOT_COMPLETED permission already present
+  - VERIFIED on device via adb reboot: restart cleared all alarms; on boot
+    BootReceiver logged "rescheduled alarm (alarmTime=390, ok=true)" and
+    dumpsys alarm showed the pending alarm at 2026-06-04 06:30:00 (next
+    occurrence of the saved 06:30 config). Note: Samsung staggers boot
+    broadcasts — ours arrived ~4 min after sys.boot_completed=1

@@ -9,6 +9,9 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import com.personalmorningalarm.receiver.AlarmReceiver
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 
 /**
  * Schedules and cancels exact alarms via [AlarmManager].
@@ -48,6 +51,30 @@ class AlarmScheduler(private val context: Context) {
         )
         Log.d(TAG, "Alarm scheduled for $triggerAtMillis (requestCode=$requestCode)")
         return true
+    }
+
+    /**
+     * Schedules the alarm for the next occurrence of a daily wall-clock time,
+     * given as minutes since midnight (e.g. 06:30 -> 390). If that time has
+     * already passed today, schedules it for tomorrow. Returns false if exact
+     * alarms aren't permitted. Used both when saving the alarm and when
+     * rescheduling after a reboot.
+     */
+    fun scheduleDailyAlarm(alarmTimeMinutes: Int, requestCode: Int = DEFAULT_REQUEST_CODE): Boolean {
+        return scheduleAlarm(nextTriggerMillis(alarmTimeMinutes), requestCode)
+    }
+
+    /** Epoch millis of the next occurrence of [alarmTimeMinutes] (today or tomorrow). */
+    fun nextTriggerMillis(
+        alarmTimeMinutes: Int,
+        from: LocalDateTime = LocalDateTime.now()
+    ): Long {
+        val time = LocalTime.of(alarmTimeMinutes / 60, alarmTimeMinutes % 60)
+        var next = from.toLocalDate().atTime(time)
+        if (!next.isAfter(from)) {
+            next = next.plusDays(1)
+        }
+        return next.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
 
     fun cancelAlarm(requestCode: Int = DEFAULT_REQUEST_CODE) {
