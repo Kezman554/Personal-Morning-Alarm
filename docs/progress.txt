@@ -32,3 +32,21 @@
   - ViewBinding was already enabled in build.gradle (no change needed)
   - Built debug APK successfully; not yet run on device (none attached)
   - APK still ~28.5 MB (ML Kit barcode bundle); size trim still outstanding
+
+2026-06-03  Room database layer
+  - 5 entities (data/entity/): AlarmConfig, AlarmEvent, NfcTag, ContentToggle,
+    BundledQuote. AlarmConfig.alarmTime is minutes-since-midnight; AlarmEvent.date
+    is "yyyy-MM-dd" (indexed). Unique indexes on NfcTag.tagId and
+    ContentToggle.contentType. NfcTag.order maps to column tag_order (SQL keyword)
+  - Enums MorningGoal, ContentType (data/model/) + Converters for Room
+  - DAO per entity (data/dao/) with CRUD plus getActiveNfcTags,
+    getEnabledContentToggles, getSuccessRateSince, getSuccessDates(Desc/Asc)
+  - AppDatabase: all entities/DAOs, @TypeConverters, thread-safe getInstance()
+  - AlarmRepository: suspend wrappers over every DAO + stats:
+    getWeeklySuccessRate (SQL, trailing 7 days), getCurrentStreak/getLongestStreak
+    computed in Kotlin via LocalDate (window/recursive-CTE unreliable at minSdk 26)
+  - "Success" for streaks = stage2Success == true; current streak anchors on
+    today or yesterday so an unattempted morning doesn't break a live streak
+  - ui/ViewModelFactory: builds any ViewModel(AlarmRepository)
+  - MainActivity has a temporary Room smoke test (insert + read AlarmConfig,
+    logs under tag PMA); marked TODO, kept in for now. Builds successfully
