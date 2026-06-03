@@ -109,7 +109,7 @@ Future: External REST API for personalised content
 
 Constraints
 
-Min API level 26 (Android 8.0), primary test device API 30
+Min API level 26 (Android 8.0), primary test device API 33 (Galaxy A32 5G on Android 13)
 Must work offline (no network dependency at alarm time)
 Battery usage < 5% overnight
 App size < 20MB

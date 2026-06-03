@@ -54,3 +54,20 @@
     test round-tripped AlarmConfig (inserted id=1, read back alarmTime=390 /
     06:30, EXERCISE). Note: test inserts a throwaway config row on each launch
     until removed
+
+2026-06-03  Alarm scheduling system
+  - util/AlarmScheduler: scheduleAlarm/cancelAlarm/isAlarmScheduled using
+    setExactAndAllowWhileIdle + RTC_WAKEUP (fires through Doze). Default
+    requestCode 1001; PendingIntent uses FLAG_IMMUTABLE
+  - API 31+ exact-alarm handling: canScheduleExactAlarms() check +
+    exactAlarmSettingsIntent() to ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+  - receiver/AlarmReceiver: logs when fired (tag PMA); registered in manifest
+    (exported=false); action com.personalmorningalarm.action.ALARM_FIRED
+  - HomeFragment: temporary "Schedule test alarm (1 min)" button (TODO); routes
+    to permission settings if exact alarms not allowed
+  - DEVICE NOTE: primary phone (SM-A326B / Galaxy A32 5G) is now on Android 13
+    (API 33), not API 30 as CLAUDE.md/PRD state. USE_EXACT_ALARM is auto-granted
+    on 33 so no permission prompt was needed in testing
+  - END-TO-END VERIFIED on device: tapped button 19:17:16 -> "Alarm scheduled
+    for ...696" -> receiver logged "Alarm fired at 2026-06-03 19:18:16" (exactly
+    on the 60s mark)

@@ -6,4 +6,7 @@
     <string name="title_home">Home</string>
     <string name="title_statistics">Statistics</string>
     <string name="title_settings">Settings</string>
+
+    <!-- Temporary dev controls -->
+    <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
 </resources>

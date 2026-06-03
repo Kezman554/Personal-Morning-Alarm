@@ -4,8 +4,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.personalmorningalarm.databinding.FragmentHomeBinding
+import com.personalmorningalarm.util.AlarmScheduler
 
 class HomeFragment : Fragment() {
 
@@ -19,6 +21,31 @@ class HomeFragment : Fragment() {
     ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // TODO(temporary): dev button to verify alarm scheduling end-to-end.
+        val scheduler = AlarmScheduler(requireContext())
+        binding.btnTestAlarm.setOnClickListener {
+            if (!scheduler.canScheduleExactAlarms()) {
+                Toast.makeText(
+                    requireContext(),
+                    "Grant 'Alarms & reminders' permission, then tap again",
+                    Toast.LENGTH_LONG
+                ).show()
+                scheduler.exactAlarmSettingsIntent()?.let { startActivity(it) }
+                return@setOnClickListener
+            }
+            val triggerAt = System.currentTimeMillis() + 60_000L
+            scheduler.scheduleAlarm(triggerAt)
+            Toast.makeText(
+                requireContext(),
+                "Test alarm scheduled for 1 minute from now",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     override fun onDestroyView() {

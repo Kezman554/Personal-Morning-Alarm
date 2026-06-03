@@ -28,7 +28,7 @@ Update docs/progress.txt briefly if significant work was done
 Conventions
 
 Min API level 26, target API 34
-Primary test device: Samsung Galaxy A32 5G (API 30)
+Primary test device: Samsung Galaxy A32 5G, model SM-A326B (Android 13 / API 33)
 MVVM architecture with Repository pattern throughout
 Public repo — never commit credentials, tokens, personal data, or private network details
 Foreground services for alarm and countdown reliability
