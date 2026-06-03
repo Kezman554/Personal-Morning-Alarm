@@ -17,3 +17,18 @@
   - Why: AGP 8.7.3 only supports compiling up to SDK 35; targeting 36 was
     asking it to build against a platform it doesn't understand, choking the sync
   - targetSdk (34) and minSdk (26) unchanged
+
+2026-06-03  Navigation + ViewBinding scaffold
+  - Three screens wired up: HomeFragment, StatisticsFragment, SettingsFragment
+    (ui/), each with a placeholder layout and the nullable _binding ViewBinding
+    pattern (cleared in onDestroyView)
+  - res/navigation/nav_graph.xml: 3 destinations, start = Home
+  - MainActivity now hosts a NavHostFragment and calls
+    bottomNav.setupWithNavController(); back-button/up handled by NavController
+  - activity_main.xml: FragmentContainerView + Material BottomNavigationView
+  - res/menu/bottom_nav_menu.xml: menu item IDs match nav destination IDs so
+    NavigationUI auto-wires tab switching (no manual click listeners)
+  - Added vector icons ic_home, ic_statistics, ic_settings; nav title strings
+  - ViewBinding was already enabled in build.gradle (no change needed)
+  - Built debug APK successfully; not yet run on device (none attached)
+  - APK still ~28.5 MB (ML Kit barcode bundle); size trim still outstanding
