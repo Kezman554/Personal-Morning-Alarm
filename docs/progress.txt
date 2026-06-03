@@ -50,3 +50,7 @@
   - ui/ViewModelFactory: builds any ViewModel(AlarmRepository)
   - MainActivity has a temporary Room smoke test (insert + read AlarmConfig,
     logs under tag PMA); marked TODO, kept in for now. Builds successfully
+  - First on-device run confirmed on Galaxy A32 5G (serial RFCT31JE4AZ): smoke
+    test round-tripped AlarmConfig (inserted id=1, read back alarmTime=390 /
+    06:30, EXERCISE). Note: test inserts a throwaway config row on each launch
+    until removed
