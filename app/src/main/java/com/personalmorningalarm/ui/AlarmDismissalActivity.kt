@@ -2,11 +2,8 @@ package com.personalmorningalarm.ui
 
 import android.animation.ArgbEvaluator
 import android.app.KeyguardManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.nfc.NfcAdapter
-import android.nfc.Tag
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -18,7 +15,6 @@ import android.view.View
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.IntentCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -53,12 +49,19 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private var vibrator: Vibrator? = null
 
     private var nfcAdapter: NfcAdapter? = null
-    private lateinit var nfcPendingIntent: PendingIntent
     private var checkpointManager: NfcCheckpointManager? = null
     private var showingUnlockHint = false
 
     private val keyguardManager: KeyguardManager by lazy {
         getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+    }
+
+    // Reader mode (not foreground dispatch): reliable for consecutive reads on
+    // this Samsung device, where the system NFC UI stole focus after the first
+    // tag and killed dispatch. Callback runs on a binder thread.
+    private val readerCallback = NfcAdapter.ReaderCallback { tag ->
+        val tagId = tag.id.toHex()
+        runOnUiThread { if (stage == STAGE_2) onCheckpointTag(tagId) }
     }
 
     private var stage = STAGE_1
@@ -74,6 +77,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         showWhenLockedAndTurnScreenOn()
 
+        isSessionActive = true
         binding = ActivityAlarmDismissalBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -128,13 +132,9 @@ class AlarmDismissalActivity : AppCompatActivity() {
         disableNfcDispatch()
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        if (stage != STAGE_2) return
-        val tag = IntentCompat.getParcelableExtra(intent, NfcAdapter.EXTRA_TAG, Tag::class.java)
-            ?: return
-        onCheckpointTag(tag.id.toHex())
+    override fun onDestroy() {
+        super.onDestroy()
+        isSessionActive = false
     }
 
     // --- Stage 1 ---
@@ -270,7 +270,9 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private fun onStage2Complete() {
         val seconds = ((SystemClock.elapsedRealtime() - stage2StartMs) / 1000L).toInt()
         stage = STAGE_DONE
-        disableNfcDispatch()
+        // Keep reader mode engaged (taps now ignored, since stage != STAGE_2) until
+        // the activity pauses — otherwise a lingering chip gets grabbed by the
+        // system's own NFC popup. onPause/onDestroy disables it.
         CountdownService.stop(this)
         logStage2Success(seconds)
 
@@ -321,13 +323,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     private fun setupNfc() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-        val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            PendingIntent.FLAG_MUTABLE
-        } else {
-            0
-        }
-        nfcPendingIntent = PendingIntent.getActivity(this, 0, intent, flags)
     }
 
     /**
@@ -344,11 +339,11 @@ class AlarmDismissalActivity : AppCompatActivity() {
     }
 
     private fun enableNfcDispatch() {
-        runCatching { nfcAdapter?.enableForegroundDispatch(this, nfcPendingIntent, null, null) }
+        runCatching { nfcAdapter?.enableReaderMode(this, readerCallback, READER_FLAGS, null) }
     }
 
     private fun disableNfcDispatch() {
-        runCatching { nfcAdapter?.disableForegroundDispatch(this) }
+        runCatching { nfcAdapter?.disableReaderMode(this) }
     }
 
     // --- Window flags / helpers ---
@@ -383,6 +378,11 @@ class AlarmDismissalActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "PMA"
 
+        /** True while a wake/dismissal session is on screen, so a re-fired alarm is ignored. */
+        @Volatile
+        var isSessionActive = false
+            private set
+
         private const val STAGE_1 = 1
         private const val STAGE_TRANSITION = 2
         private const val STAGE_2 = 3
@@ -400,5 +400,12 @@ class AlarmDismissalActivity : AppCompatActivity() {
         private const val COLOR_RED = 0xFFD32F2F.toInt()
         private const val COLOR_GREEN = 0xFF388E3C.toInt()
         private const val COLOR_STAGE2 = 0xFF1565C0.toInt()
+
+        private const val READER_FLAGS =
+            NfcAdapter.FLAG_READER_NFC_A or
+                NfcAdapter.FLAG_READER_NFC_B or
+                NfcAdapter.FLAG_READER_NFC_F or
+                NfcAdapter.FLAG_READER_NFC_V or
+                NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
     }
 }

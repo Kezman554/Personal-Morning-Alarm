@@ -199,4 +199,20 @@
   - GOTCHA FOUND: NFC taps are NOT delivered while the secure lock screen is up
     (taps did nothing until Nick unlocked). Added promptUnlockIfNeeded(): on
     Stage 2 start when locked, calls requestDismissKeyguard + shows "Unlock your
-    phone to tap the tags" hint. Fix is built but not yet device-verified
+    phone to tap the tags" hint.
+
+2026-06-04  Stage 2 hardening (3 follow-up fixes from on-device testing)
+  - Session guard: a re-fired alarm during an active wake session restarted
+    Stage 1 (a stray +60s test alarm fired mid-Stage-2 and hijacked it). Added
+    AlarmDismissalActivity.isSessionActive; AlarmReceiver ignores alarms while a
+    dismissal session is on screen. VERIFIED (no second alarm on retest)
+  - Unlock hint VERIFIED on device (prompt appeared when Stage 2 started locked)
+  - NFC reader mode: switched Stage 2 from enableForegroundDispatch to
+    enableReaderMode. Foreground dispatch only delivered the FIRST tag on this
+    Samsung (system NFC UI stole focus, killed dispatch); consecutive taps were
+    dropped. Reader mode (as used in Settings) fixed it. VERIFIED: wrong tag ->
+    correct tag -> advance -> complete, all consecutive reads worked
+  - Lingering-chip popup: after completion, disabling NFC immediately let the
+    system grab a still-present chip (Samsung "new tag" popup). Now reader mode
+    stays engaged (taps ignored once stage=DONE) until the activity pauses. Minor
+    fix, NOT yet device-verified
