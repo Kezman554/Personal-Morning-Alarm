@@ -149,3 +149,18 @@
     swings (delta-of-samples = frequency detector). Switch to accel-magnitude
     deviation from gravity so forceful swings register too; bundle with the
     planned sensitivity setting
+
+2026-06-04  CountdownService brought up to full spec
+  - Was created with the Stage 2 work; this round added the missing pieces:
+    * Duration falls back to AlarmConfig.stage2DurationMinutes (default 10 min)
+      when no EXTRA_DURATION_SECONDS is supplied (reads config off the main
+      thread); start() duration arg is now optional
+    * Broadcasts ACTION_COUNTDOWN_EXPIRED on expiry (future nuclear-alarm hook;
+      nuclear still TODO)
+    * Notification tap opens MainActivity (contentIntent)
+  - Temporary dev "Test countdown (15s)" button on HomeFragment (TODO)
+  - VERIFIED on device (driven via adb, no shaking): tapped button ->
+    "CountdownService starting (15 s, explicit)" -> notification ticked down
+    0:12 -> 0:08 -> 0:05 -> at exactly 15s "countdown expired — broadcasting
+    COUNTDOWN_EXPIRED" -> service stopped. Config-read fallback is code-complete
+    (logs "from config"); only the explicit-duration path was device-tested

@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.personalmorningalarm.databinding.FragmentHomeBinding
+import com.personalmorningalarm.service.CountdownService
 import com.personalmorningalarm.util.AlarmScheduler
 
 class HomeFragment : Fragment() {
@@ -45,6 +46,12 @@ class HomeFragment : Fragment() {
                 "Test alarm scheduled for 1 minute from now",
                 Toast.LENGTH_SHORT
             ).show()
+        }
+
+        // TODO(temporary): dev button to verify the Stage 2 countdown in isolation.
+        binding.btnTestCountdown.setOnClickListener {
+            CountdownService.start(requireContext(), 15)
+            Toast.makeText(requireContext(), "15s countdown started", Toast.LENGTH_SHORT).show()
         }
     }
 

@@ -26,6 +26,7 @@
 
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
+    <string name="test_countdown">Test countdown (15s)</string>
     <string name="stop_alarm_temp">Stop alarm (temp)</string>
     <string name="abort_temp">Abort (temp)</string>
 </resources>

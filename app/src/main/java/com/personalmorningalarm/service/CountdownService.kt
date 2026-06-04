@@ -3,6 +3,7 @@ package com.personalmorningalarm.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -12,20 +13,32 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.personalmorningalarm.R
+import com.personalmorningalarm.data.AlarmRepository
+import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.ui.MainActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
  * Foreground service that runs the Stage 2 countdown. Ticks once per second,
- * publishing the remaining seconds via [remainingSeconds] for the UI and a
- * notification. When it expires the nuclear alarm will eventually fire (TODO);
- * for now it just logs and stops.
+ * publishing the remaining seconds via [remainingSeconds] and a notification
+ * (tap opens the app). Duration comes from the start intent's
+ * [EXTRA_DURATION_SECONDS], or falls back to [AlarmConfig]'s stage2 duration
+ * (default 10 minutes). On expiry it broadcasts [ACTION_COUNTDOWN_EXPIRED]
+ * (the future nuclear alarm will listen for this).
  */
 class CountdownService : Service() {
 
     private var timer: CountDownTimer? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -40,12 +53,26 @@ class CountdownService : Service() {
             return START_NOT_STICKY
         }
 
-        val totalSeconds = intent?.getIntExtra(EXTRA_DURATION_SECONDS, DEFAULT_DURATION_SECONDS)
-            ?: DEFAULT_DURATION_SECONDS
-        Log.d(TAG, "CountdownService starting ($totalSeconds s)")
-        startForeground(NOTIFICATION_ID, buildNotification(totalSeconds))
+        val explicitSeconds = intent?.getIntExtra(EXTRA_DURATION_SECONDS, -1) ?: -1
+        val initialSeconds =
+            if (explicitSeconds > 0) explicitSeconds else DEFAULT_DURATION_MINUTES * 60
+        startForeground(NOTIFICATION_ID, buildNotification(initialSeconds))
         isRunning = true
-        startTimer(totalSeconds)
+
+        if (explicitSeconds > 0) {
+            Log.d(TAG, "CountdownService starting ($explicitSeconds s, explicit)")
+            startTimer(explicitSeconds)
+        } else {
+            // No duration supplied — read it from the saved config.
+            serviceScope.launch {
+                val minutes = withContext(Dispatchers.IO) {
+                    AlarmRepository(AppDatabase.getInstance(this@CountdownService))
+                        .getCurrentConfig()?.stage2DurationMinutes
+                } ?: DEFAULT_DURATION_MINUTES
+                Log.d(TAG, "CountdownService starting (${minutes * 60} s, from config)")
+                startTimer(minutes * 60)
+            }
+        }
         return START_STICKY
     }
 
@@ -55,6 +82,7 @@ class CountdownService : Service() {
         timer?.cancel()
         timer = null
         _remainingSeconds.value = 0
+        serviceScope.cancel()
         super.onDestroy()
     }
 
@@ -70,8 +98,9 @@ class CountdownService : Service() {
 
             override fun onFinish() {
                 _remainingSeconds.value = 0
-                Log.d(TAG, "Stage 2 countdown expired — nuclear alarm TODO")
-                // TODO: trigger nuclear alarm on expiry.
+                Log.d(TAG, "Stage 2 countdown expired — broadcasting $ACTION_COUNTDOWN_EXPIRED")
+                sendBroadcast(Intent(ACTION_COUNTDOWN_EXPIRED).setPackage(packageName))
+                // TODO: nuclear alarm receiver will react to the broadcast.
                 stopSelf()
             }
         }.start()
@@ -84,11 +113,25 @@ class CountdownService : Service() {
             .setSmallIcon(R.drawable.ic_launcher)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setContentIntent(appPendingIntent())
             .build()
 
     private fun updateNotification(seconds: Int) {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, buildNotification(seconds))
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, buildNotification(seconds))
+    }
+
+    /** Tapping the notification opens the app. */
+    private fun appPendingIntent(): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        return PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
     }
 
     private fun createNotificationChannel() {
@@ -108,10 +151,11 @@ class CountdownService : Service() {
         private const val TAG = "PMA"
         private const val CHANNEL_ID = "countdown_channel"
         private const val NOTIFICATION_ID = 3001
-        private const val DEFAULT_DURATION_SECONDS = 10 * 60
+        private const val DEFAULT_DURATION_MINUTES = 10
 
         const val EXTRA_DURATION_SECONDS = "extra_duration_seconds"
         const val ACTION_STOP = "com.personalmorningalarm.action.STOP_COUNTDOWN"
+        const val ACTION_COUNTDOWN_EXPIRED = "com.personalmorningalarm.action.COUNTDOWN_EXPIRED"
 
         private val _remainingSeconds = MutableStateFlow(0)
 
@@ -122,9 +166,10 @@ class CountdownService : Service() {
         var isRunning: Boolean = false
             private set
 
-        fun start(context: Context, durationSeconds: Int) {
+        /** Start with an explicit duration. Omit to read it from AlarmConfig. */
+        fun start(context: Context, durationSeconds: Int? = null) {
             val intent = Intent(context, CountdownService::class.java).apply {
-                putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
+                durationSeconds?.let { putExtra(EXTRA_DURATION_SECONDS, it) }
             }
             context.startForegroundService(intent)
         }
