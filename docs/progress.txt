@@ -164,3 +164,20 @@
     0:12 -> 0:08 -> 0:05 -> at exactly 15s "countdown expired — broadcasting
     COUNTDOWN_EXPIRED" -> service stopped. Config-read fallback is code-complete
     (logs "from config"); only the explicit-duration path was device-tested
+
+2026-06-04  NFC tag registration in Settings
+  - SettingsFragment rebuilt: NFC section with status text, "Register New Tag"
+    button, active-tag count, RecyclerView list (label + location + delete)
+  - MVVM: SettingsViewModel(repository) via existing ViewModelFactory; reactive
+    Room Flow queries (NfcTagDao.observeAll / observeActiveCount) so the list and
+    count auto-refresh. NfcTagAdapter (ListAdapter + DiffUtil)
+  - Registration uses NfcAdapter.enableReaderMode (modern equivalent of
+    foreground dispatch; cleaner with fragments — no MainActivity.onNewIntent).
+    Reader callback (binder thread) -> UI thread -> label/location dialog ->
+    viewModel.registerTag (dedupe on tagId, order = current count)
+  - NFC availability handled: no adapter -> "no NFC" + button disabled; disabled
+    -> "NFC off, tap to open settings" + opens ACTION_NFC_SETTINGS
+  - Added recyclerview dependency (was only transitive via Material)
+  - VERIFIED on device: settings UI renders; NFC-off status message confirmed via
+    adb toggle; Nick registered a real tag ("Living Room tissue box") -> saved,
+    shown in list, "Active tags: 1", persisted across navigation (DB-backed)

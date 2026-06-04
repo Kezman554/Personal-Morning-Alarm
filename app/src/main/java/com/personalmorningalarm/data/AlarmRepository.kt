@@ -5,6 +5,7 @@ import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.BundledQuote
 import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
+import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
 /**
@@ -40,6 +41,8 @@ class AlarmRepository(private val db: AppDatabase) {
     suspend fun getAllTags(): List<NfcTag> = nfcTagDao.getAll()
     suspend fun getTagByHardwareId(tagId: String): NfcTag? = nfcTagDao.getByTagId(tagId)
     suspend fun getActiveNfcTags(): List<NfcTag> = nfcTagDao.getActiveNfcTags()
+    fun observeTags(): Flow<List<NfcTag>> = nfcTagDao.observeAll()
+    fun observeActiveTagCount(): Flow<Int> = nfcTagDao.observeActiveCount()
 
     // --- Content toggles ---
     suspend fun saveContentToggle(toggle: ContentToggle): Long = contentToggleDao.insert(toggle)

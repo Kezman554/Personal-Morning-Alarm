@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.personalmorningalarm.data.entity.NfcTag
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NfcTagDao {
@@ -31,4 +32,12 @@ interface NfcTagDao {
 
     @Query("SELECT * FROM nfc_tags WHERE isActive = 1 ORDER BY tag_order ASC")
     suspend fun getActiveNfcTags(): List<NfcTag>
+
+    /** Reactive stream of all tags for the management UI. */
+    @Query("SELECT * FROM nfc_tags ORDER BY tag_order ASC")
+    fun observeAll(): Flow<List<NfcTag>>
+
+    /** Reactive count of active tags. */
+    @Query("SELECT COUNT(*) FROM nfc_tags WHERE isActive = 1")
+    fun observeActiveCount(): Flow<Int>
 }

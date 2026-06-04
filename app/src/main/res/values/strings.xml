@@ -7,6 +7,22 @@
     <string name="title_statistics">Statistics</string>
     <string name="title_settings">Settings</string>
 
+    <!-- NFC tag management -->
+    <string name="nfc_section_title">NFC Tags</string>
+    <string name="register_new_tag">Register New Tag</string>
+    <string name="active_tag_count">Active tags: %1$d</string>
+    <string name="nfc_unavailable">This device has no NFC.</string>
+    <string name="nfc_disabled">NFC is turned off. Tap to open NFC settings.</string>
+    <string name="nfc_ready">Tap “Register New Tag”, then hold a tag to the back of the phone.</string>
+    <string name="nfc_hold_tag">Hold an NFC tag to the back of your phone…</string>
+    <string name="register_dialog_title">Name this tag</string>
+    <string name="label_hint">Label (e.g. Bathroom)</string>
+    <string name="location_hint">Location (e.g. Upstairs)</string>
+    <string name="no_tags_yet">No tags registered yet.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+
     <!-- Alarm service + dismissal -->
     <string name="alarm_channel_name">Alarm</string>
     <string name="alarm_channel_description">Plays the morning alarm</string>
