@@ -181,3 +181,22 @@
   - VERIFIED on device: settings UI renders; NFC-off status message confirmed via
     adb toggle; Nick registered a real tag ("Living Room tissue box") -> saved,
     shown in list, "Active tags: 1", persisted across navigation (DB-backed)
+
+2026-06-04  Stage 2 NFC checkpoint sequence
+  - challenge/NfcCheckpointManager: shuffles active tags at construction (random
+    order each morning), tracks current index, validates scanned tagId ->
+    CheckpointResult (Correct/Wrong/SequenceComplete/AlreadyComplete)
+  - AlarmDismissalActivity Stage 2: shows "X of N" + "Go to: <label>" + the
+    CountdownService timer. NFC via enableForegroundDispatch + onNewIntent (clean
+    in an activity, unlike the fragment's reader mode). Correct -> advance; wrong
+    -> "Wrong tag - find <label>" + buzz; final -> stop countdown, log Stage 2
+    success (with seconds), show "All done", finish. No tags registered (or NFC
+    off) -> "tap to confirm" fallback button
+  - VERIFIED on device (Nick, 2 real tags "...tissue box" + "crocodile"): shake
+    cleared Stage 1; Stage 2 randomised 2 checkpoints; logs show "Checkpoint
+    correct -> next: crocodile", "Wrong tag - still need: crocodile", "All
+    checkpoints tapped", "Stage 2 success logged (85 s)". All mechanics confirmed
+  - GOTCHA FOUND: NFC taps are NOT delivered while the secure lock screen is up
+    (taps did nothing until Nick unlocked). Added promptUnlockIfNeeded(): on
+    Stage 2 start when locked, calls requestDismissKeyguard + shows "Unlock your
+    phone to tap the tags" hint. Fix is built but not yet device-verified

@@ -34,6 +34,12 @@
     <string name="seconds_format">%1$ds</string>
     <string name="stage1_success">Nice — you\'re up!</string>
     <string name="stage2_title">Stage 2 — get moving</string>
+    <string name="stage2_go_to">Go to: %1$s</string>
+    <string name="checkpoint_progress">%1$d of %2$d</string>
+    <string name="wrong_tag">Wrong tag — find %1$s</string>
+    <string name="tap_to_confirm">Tap to confirm</string>
+    <string name="stage2_complete">All done — great job!</string>
+    <string name="nfc_unlock_hint">Unlock your phone to tap the tags</string>
 
     <!-- Stage 2 countdown service -->
     <string name="countdown_channel_name">Stage 2 countdown</string>
