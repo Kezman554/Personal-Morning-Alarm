@@ -241,3 +241,14 @@
   - Added temporary registration logging in SettingsFragment while diagnosing a
     tag-add hiccup (was a timing issue — tag tapped before reader was listening)
   - STRETCH duration hardcoded 5 min (TODO: make configurable in settings)
+
+2026-06-05  Split NFC tag management to its own screen (Nick's suggestion)
+  - Settings was getting cramped (tag list + content toggles). Moved NFC tag
+    management to a dedicated NfcTagsFragment (+ NfcTagsViewModel,
+    fragment_nfc_tags.xml). Settings now shows a "Manage NFC tags" button +
+    the content toggles only
+  - nav_graph: added nfcTagsFragment destination + action_settings_to_nfcTags;
+    SettingsFragment navigates to it. Back returns to Settings
+  - SettingsViewModel trimmed to content toggles; tag CRUD lives in NfcTagsViewModel
+  - VERIFIED on device: Settings shows Manage button + 3 toggles (no list); tapping
+    opens the tags page ("Active tags: 3" — Nick's 3rd tag); Back returns to Settings

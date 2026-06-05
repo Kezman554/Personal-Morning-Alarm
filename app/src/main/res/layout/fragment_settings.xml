@@ -16,33 +16,12 @@
             android:text="@string/nfc_section_title"
             android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
-        <TextView
-            android:id="@+id/tv_nfc_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-
         <Button
-            android:id="@+id/btn_register_tag"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/register_new_tag" />
-
-        <TextView
-            android:id="@+id/tv_active_count"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textAppearance="?attr/textAppearanceTitleSmall" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_tags"
+            android:id="@+id/btn_manage_tags"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:nestedScrollingEnabled="false" />
+            android:text="@string/manage_nfc_tags" />
 
         <TextView
             android:id="@+id/content_section_title"

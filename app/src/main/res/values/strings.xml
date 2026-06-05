@@ -9,6 +9,8 @@
 
     <!-- NFC tag management -->
     <string name="nfc_section_title">NFC Tags</string>
+    <string name="nfc_tags_screen_title">NFC Tags</string>
+    <string name="manage_nfc_tags">Manage NFC tags</string>
     <string name="register_new_tag">Register New Tag</string>
     <string name="active_tag_count">Active tags: %1$d</string>
     <string name="nfc_unavailable">This device has no NFC.</string>

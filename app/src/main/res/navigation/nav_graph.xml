@@ -21,6 +21,16 @@
         android:id="@+id/settingsFragment"
         android:name="com.personalmorningalarm.ui.SettingsFragment"
         android:label="@string/title_settings"
-        tools:layout="@layout/fragment_settings" />
+        tools:layout="@layout/fragment_settings">
+        <action
+            android:id="@+id/action_settings_to_nfcTags"
+            app:destination="@id/nfcTagsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nfcTagsFragment"
+        android:name="com.personalmorningalarm.ui.NfcTagsFragment"
+        android:label="@string/nfc_tags_screen_title"
+        tools:layout="@layout/fragment_nfc_tags" />
 
 </navigation>
