@@ -216,3 +216,10 @@
     system grab a still-present chip (Samsung "new tag" popup). Now reader mode
     stays engaged (taps ignored once stage=DONE) until the activity pauses. Minor
     fix, NOT yet device-verified
+
+2026-06-05  Delete-tag confirmation
+  - SettingsFragment: tapping a tag's delete (trash) now shows a "Delete tag? /
+    Remove <label> from your checkpoints?" dialog before removing (was instant).
+    Cancel keeps it, Delete calls viewModel.deleteTag
+  - VERIFIED on device (adb-driven): dialog shows the tag label; Cancel left
+    "Active tags: 2" unchanged

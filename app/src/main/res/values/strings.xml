@@ -19,6 +19,8 @@
     <string name="label_hint">Label (e.g. Bathroom)</string>
     <string name="location_hint">Location (e.g. Upstairs)</string>
     <string name="no_tags_yet">No tags registered yet.</string>
+    <string name="delete_tag_title">Delete tag?</string>
+    <string name="delete_tag_message">Remove “%1$s” from your checkpoints?</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>

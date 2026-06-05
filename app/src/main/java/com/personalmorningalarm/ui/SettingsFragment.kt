@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.personalmorningalarm.R
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.entity.NfcTag
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
 import kotlinx.coroutines.launch
 
@@ -32,7 +33,7 @@ class SettingsFragment : Fragment() {
         ViewModelFactory(AlarmRepository(AppDatabase.getInstance(requireContext())))
     }
 
-    private val tagAdapter = NfcTagAdapter(onDelete = { tag -> viewModel.deleteTag(tag) })
+    private val tagAdapter = NfcTagAdapter(onDelete = { tag -> confirmDelete(tag) })
 
     private var nfcAdapter: NfcAdapter? = null
     private var registering = false
@@ -168,6 +169,15 @@ class SettingsFragment : Fragment() {
                 val location = locationInput.text.toString().trim()
                 viewModel.registerTag(tagId, label, location)
             }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun confirmDelete(tag: NfcTag) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.delete_tag_title)
+            .setMessage(getString(R.string.delete_tag_message, tag.label))
+            .setPositiveButton(R.string.delete) { _, _ -> viewModel.deleteTag(tag) }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
