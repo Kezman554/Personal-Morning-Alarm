@@ -90,6 +90,70 @@
 
     </LinearLayout>
 
+    <!-- Content screen (quote / stretch / placeholder), shown between checkpoints -->
+    <LinearLayout
+        android:id="@+id/content_panel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/btn_stop_alarm"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/content_heading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@android:color/white"
+            tools:text="Take a moment" />
+
+        <TextView
+            android:id="@+id/content_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+            android:textColor="@android:color/white"
+            tools:text="It always seems impossible until it's done." />
+
+        <TextView
+            android:id="@+id/content_author"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
+            android:textColor="@android:color/white"
+            android:visibility="gone"
+            tools:text="— Nelson Mandela"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/content_timer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@android:color/white"
+            android:textSize="48sp"
+            android:visibility="gone"
+            tools:text="5:00"
+            tools:visibility="visible" />
+
+        <Button
+            android:id="@+id/btn_continue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/content_continue" />
+
+    </LinearLayout>
+
     <!-- TODO(temporary): abort control for testing Stage 1/2. -->
     <Button
         android:id="@+id/btn_stop_alarm"

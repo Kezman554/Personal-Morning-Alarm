@@ -223,3 +223,21 @@
     Cancel keeps it, Delete calls viewModel.deleteTag
   - VERIFIED on device (adb-driven): dialog shows the tag label; Cancel left
     "Active tags: 2" unchanged
+
+2026-06-05  Content screens between NFC checkpoints
+  - challenge/ContentScreenManager: maps each gap between checkpoints to an
+    enabled content type, cycling in display order (N tags -> N-1 gaps)
+  - AlarmDismissalActivity: after a correct tap (not the last), shows an inline
+    content panel before the next checkpoint. Quote (random BundledQuote +
+    author), Stretch (suggestions + 5-min countdown, auto-advances or Continue),
+    Placeholder (shows morning goal). Taps ignored while content is up
+  - PersonalMorningAlarmApp (new Application): seeds 40 bundled quotes + default
+    content toggles (quote+stretch on, placeholder off) on first launch
+  - Settings: content-toggle switches (Quote/Stretch/Placeholder) backed by a
+    reactive ContentToggle Flow; SettingsViewModel.setContentEnabled
+  - VERIFIED on device: seeding logged "Seeded 40 bundled quotes" + default
+    toggles; toggle switches render in Settings. NOT yet verified: the actual
+    content-between-taps during a Stage 2 run (needs a shake-through with 3+ tags)
+  - Added temporary registration logging in SettingsFragment while diagnosing a
+    tag-add hiccup (was a timing issue — tag tapped before reader was listening)
+  - STRETCH duration hardcoded 5 min (TODO: make configurable in settings)

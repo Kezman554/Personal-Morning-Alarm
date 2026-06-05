@@ -43,6 +43,22 @@
     <string name="stage2_complete">All done — great job!</string>
     <string name="nfc_unlock_hint">Unlock your phone to tap the tags</string>
 
+    <!-- Content screens -->
+    <string name="content_continue">Continue</string>
+    <string name="content_quote_heading">Take a moment</string>
+    <string name="content_stretch_heading">Stretch it out</string>
+    <string name="content_goal_heading">Today\'s goal</string>
+    <string name="quote_author_format">— %1$s</string>
+    <string name="stretch_suggestions">• Reach for the sky\n• Roll your shoulders back\n• Reach down toward your toes\n• Gentle neck rolls\n• Side stretches, each way</string>
+    <string name="goal_exercise">Exercise</string>
+    <string name="goal_project">Project work</string>
+
+    <!-- Content toggles (Settings) -->
+    <string name="content_section_title">Content screens</string>
+    <string name="toggle_quote">Motivational quote</string>
+    <string name="toggle_stretch">Stretching</string>
+    <string name="toggle_placeholder">Daily goal (placeholder)</string>
+
     <!-- Stage 2 countdown service -->
     <string name="countdown_channel_name">Stage 2 countdown</string>
     <string name="countdown_channel_description">Shows the Stage 2 time remaining</string>

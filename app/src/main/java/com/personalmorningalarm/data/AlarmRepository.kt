@@ -5,6 +5,7 @@ import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.BundledQuote
 import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
+import com.personalmorningalarm.data.model.ContentType
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -51,6 +52,9 @@ class AlarmRepository(private val db: AppDatabase) {
     suspend fun getAllContentToggles(): List<ContentToggle> = contentToggleDao.getAll()
     suspend fun getEnabledContentToggles(): List<ContentToggle> =
         contentToggleDao.getEnabledContentToggles()
+    suspend fun getContentToggle(type: ContentType): ContentToggle? =
+        contentToggleDao.getByType(type)
+    fun observeContentToggles(): Flow<List<ContentToggle>> = contentToggleDao.observeAll()
 
     // --- Bundled quotes ---
     suspend fun addQuote(quote: BundledQuote): Long = bundledQuoteDao.insert(quote)

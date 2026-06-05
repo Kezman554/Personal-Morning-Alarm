@@ -6,6 +6,7 @@ import android.content.Context
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -20,11 +21,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.personalmorningalarm.R
 import com.personalmorningalarm.challenge.CheckpointResult
+import com.personalmorningalarm.challenge.ContentScreenManager
 import com.personalmorningalarm.challenge.NfcCheckpointManager
 import com.personalmorningalarm.challenge.ShakeChallenge
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.entity.AlarmEvent
+import com.personalmorningalarm.data.model.ContentType
 import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.databinding.ActivityAlarmDismissalBinding
 import com.personalmorningalarm.service.AlarmService
@@ -50,6 +53,10 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     private var nfcAdapter: NfcAdapter? = null
     private var checkpointManager: NfcCheckpointManager? = null
+    private var contentScreenManager: ContentScreenManager? = null
+    private var gapsShown = 0
+    private var showingContent = false
+    private var stretchTimer: CountDownTimer? = null
     private var showingUnlockHint = false
 
     private val keyguardManager: KeyguardManager by lazy {
@@ -134,6 +141,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stretchTimer?.cancel()
         isSessionActive = false
     }
 
@@ -217,12 +225,15 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val tags = repository.getActiveNfcTags()
+            val enabledTypes = repository.getEnabledContentToggles().map { it.contentType }
+            contentScreenManager = ContentScreenManager(enabledTypes)
             if (tags.isEmpty() || nfcAdapter?.isEnabled != true) {
                 Log.d(TAG, "Stage 2: no usable NFC tags — falling back to confirm button")
                 setupFallbackConfirm()
             } else {
                 checkpointManager = NfcCheckpointManager(tags)
-                Log.d(TAG, "Stage 2: ${tags.size} checkpoints, tap order randomised")
+                Log.d(TAG, "Stage 2: ${tags.size} checkpoints, tap order randomised; " +
+                    "content types=$enabledTypes")
                 enableNfcDispatch()
                 showCheckpoint()
                 promptUnlockIfNeeded()
@@ -240,10 +251,13 @@ class AlarmDismissalActivity : AppCompatActivity() {
     }
 
     private fun onCheckpointTag(tagId: String) {
+        if (showingContent) return // ignore taps while a content screen is up
         when (val result = checkpointManager?.onTagScanned(tagId)) {
             is CheckpointResult.Correct -> {
                 Log.d(TAG, "Checkpoint correct — next: ${result.next.label}")
-                showCheckpoint()
+                val content = contentScreenManager?.contentForGap(gapsShown)
+                gapsShown++
+                if (content != null) showContentScreen(content) else showCheckpoint()
             }
             is CheckpointResult.Wrong -> {
                 Log.d(TAG, "Wrong tag — still need: ${result.expected.label}")
@@ -265,6 +279,67 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.tvTitle.text = getString(R.string.stage2_title)
         binding.btnConfirm.visibility = View.VISIBLE
         binding.btnConfirm.setOnClickListener { onStage2Complete() }
+    }
+
+    // --- Content screens (between checkpoints) ---
+
+    private fun showContentScreen(type: ContentType) {
+        showingContent = true
+        binding.content.visibility = View.GONE
+        binding.contentPanel.visibility = View.VISIBLE
+        binding.contentAuthor.visibility = View.GONE
+        binding.contentTimer.visibility = View.GONE
+        stretchTimer?.cancel()
+        binding.btnContinue.setOnClickListener { onContentContinue() }
+
+        when (type) {
+            ContentType.QUOTE -> showQuoteContent()
+            ContentType.STRETCH -> showStretchContent()
+            ContentType.PLACEHOLDER -> showGoalContent()
+        }
+        Log.d(TAG, "Content screen shown: $type")
+    }
+
+    private fun showQuoteContent() {
+        binding.contentHeading.text = getString(R.string.content_quote_heading)
+        lifecycleScope.launch {
+            val quote = repository.getRandomQuote()
+            binding.contentBody.text = quote?.quoteText.orEmpty()
+            val author = quote?.author
+            if (!author.isNullOrBlank()) {
+                binding.contentAuthor.visibility = View.VISIBLE
+                binding.contentAuthor.text = getString(R.string.quote_author_format, author)
+            }
+        }
+    }
+
+    private fun showStretchContent() {
+        binding.contentHeading.text = getString(R.string.content_stretch_heading)
+        binding.contentBody.text = getString(R.string.stretch_suggestions)
+        binding.contentTimer.visibility = View.VISIBLE
+        stretchTimer = object : CountDownTimer(STRETCH_DURATION_MS, 1000L) {
+            override fun onTick(msLeft: Long) {
+                binding.contentTimer.text = CountdownService.formatTime((msLeft / 1000L).toInt())
+            }
+            override fun onFinish() = onContentContinue() // auto-advance when timer ends
+        }.start()
+    }
+
+    private fun showGoalContent() {
+        binding.contentHeading.text = getString(R.string.content_goal_heading)
+        binding.contentBody.text = when (morningGoal) {
+            MorningGoal.EXERCISE -> getString(R.string.goal_exercise)
+            MorningGoal.PROJECT -> getString(R.string.goal_project)
+        }
+    }
+
+    private fun onContentContinue() {
+        stretchTimer?.cancel()
+        stretchTimer = null
+        showingContent = false
+        binding.contentPanel.visibility = View.GONE
+        binding.content.visibility = View.VISIBLE
+        showCheckpoint()
     }
 
     private fun onStage2Complete() {
@@ -393,6 +468,10 @@ class AlarmDismissalActivity : AppCompatActivity() {
         private const val DEFAULT_STAGE2_MINUTES = 10
         private const val SUCCESS_DELAY_MS = 1200L
         private const val DONE_DELAY_MS = 2000L
+
+        // Stretch screen timer. Default 5 min (PRD: 5/10 min); the Continue button
+        // skips it. TODO: make configurable from settings.
+        private const val STRETCH_DURATION_MS = 5 * 60 * 1000L
         private const val PULSE_INTERVAL_MS = 200L
         private const val PULSE_MS = 30L
         private const val WRONG_PULSE_MS = 150L

@@ -3,7 +3,9 @@ package com.personalmorningalarm.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personalmorningalarm.data.AlarmRepository
+import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
+import com.personalmorningalarm.data.model.ContentType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,9 +23,21 @@ class SettingsViewModel(private val repository: AlarmRepository) : ViewModel() {
     val activeTagCount: StateFlow<Int> = repository.observeActiveTagCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** Content-screen toggles for the settings switches. */
+    val contentToggles: StateFlow<List<ContentToggle>> = repository.observeContentToggles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /** One-off user messages (toasts). */
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
+
+    fun setContentEnabled(type: ContentType, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.getContentToggle(type)?.let {
+                repository.updateContentToggle(it.copy(isEnabled = enabled))
+            }
+        }
+    }
 
     fun registerTag(tagId: String, label: String, location: String) {
         viewModelScope.launch {

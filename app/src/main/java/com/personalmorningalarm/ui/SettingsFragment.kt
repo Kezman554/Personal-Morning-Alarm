@@ -5,6 +5,7 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +22,7 @@ import com.personalmorningalarm.R
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.entity.NfcTag
+import com.personalmorningalarm.data.model.ContentType
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
 import kotlinx.coroutines.launch
 
@@ -42,6 +44,7 @@ class SettingsFragment : Fragment() {
     // Reader-mode callback fires on a binder thread — hop to the UI thread.
     private val readerCallback = NfcAdapter.ReaderCallback { tag ->
         val tagId = tag.id.toHex()
+        Log.d(TAG, "Settings reader read tag $tagId (registering=$registering)")
         activity?.runOnUiThread {
             if (!registering) return@runOnUiThread
             stopRegistration()
@@ -68,12 +71,34 @@ class SettingsFragment : Fragment() {
 
         binding.btnRegisterTag.setOnClickListener { startRegistration() }
 
+        // onClick fires only on user taps (not programmatic setChecked), so no feedback loop.
+        binding.switchQuote.setOnClickListener {
+            viewModel.setContentEnabled(ContentType.QUOTE, binding.switchQuote.isChecked)
+        }
+        binding.switchStretch.setOnClickListener {
+            viewModel.setContentEnabled(ContentType.STRETCH, binding.switchStretch.isChecked)
+        }
+        binding.switchPlaceholder.setOnClickListener {
+            viewModel.setContentEnabled(ContentType.PLACEHOLDER, binding.switchPlaceholder.isChecked)
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.tags.collect { tagAdapter.submitList(it) } }
                 launch {
                     viewModel.activeTagCount.collect {
                         binding.tvActiveCount.text = getString(R.string.active_tag_count, it)
+                    }
+                }
+                launch {
+                    viewModel.contentToggles.collect { toggles ->
+                        toggles.forEach { t ->
+                            when (t.contentType) {
+                                ContentType.QUOTE -> binding.switchQuote.isChecked = t.isEnabled
+                                ContentType.STRETCH -> binding.switchStretch.isChecked = t.isEnabled
+                                ContentType.PLACEHOLDER -> binding.switchPlaceholder.isChecked = t.isEnabled
+                            }
+                        }
                     }
                 }
                 launch { viewModel.messages.collect { toast(it) } }
@@ -129,6 +154,7 @@ class SettingsFragment : Fragment() {
                 registering = true
                 adapter.enableReaderMode(requireActivity(), readerCallback, READER_FLAGS, null)
                 showWaitingDialog()
+                Log.d(TAG, "Registration started — reader mode enabled, waiting for a tag")
             }
         }
     }
@@ -189,6 +215,8 @@ class SettingsFragment : Fragment() {
     private fun ByteArray.toHex(): String = joinToString("") { "%02X".format(it) }
 
     companion object {
+        private const val TAG = "PMA"
+
         private const val READER_FLAGS =
             NfcAdapter.FLAG_READER_NFC_A or
                 NfcAdapter.FLAG_READER_NFC_B or
