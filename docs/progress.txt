@@ -274,3 +274,20 @@
     (threshold 3.5 has big headroom). Quote + Stretch content screens both appeared.
     Full Stage 1 -> content -> Stage 2 flow works end to end
   - Diagnostics logging removed after tuning
+
+2026-06-06  Content toggle settings + stretch duration selector
+  - Most of this was already built (Morning Content switches + seeding). New work:
+  - Renamed Settings section "Content screens" -> "Morning Content"
+  - Stretch duration selector (5/10 min radio) under the Stretch switch, shown
+    only when stretching is enabled. Saved to ContentToggle.durationMinutes
+  - Schema change: added duration_minutes to content_toggles via a NON-destructive
+    Room migration (v1->v2, ALTER TABLE ADD COLUMN default 5) so registered NFC
+    tags + seeded quotes are preserved. Bumped DB version to 2 + addMigrations
+  - SettingsViewModel.setStretchDuration; AlarmDismissalActivity reads the STRETCH
+    toggle's durationMinutes for the stretch screen (was hardcoded 5)
+  - Display order: fixed for V1 (display_order seeded 0/1/2; no drag-reorder)
+  - VERIFIED on device (adb): "Morning Content" + 5/10 selector render; tapping
+    10 min persists across navigation; migration kept Active tags: 3 (no wipe)
+  - NOT re-tested: full Stage 2 run confirming a disabled toggle drops its content
+    + the 10-min stretch taking effect (wired via getEnabledContentToggles; needs
+    a shake-through)

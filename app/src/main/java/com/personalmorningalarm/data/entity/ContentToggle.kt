@@ -23,5 +23,9 @@ data class ContentToggle(
     val isEnabled: Boolean = true,
 
     @ColumnInfo(name = "display_order")
-    val displayOrder: Int = 0
+    val displayOrder: Int = 0,
+
+    /** Duration in minutes; only meaningful for the STRETCH timer (default 5). */
+    @ColumnInfo(name = "duration_minutes")
+    val durationMinutes: Int = 5
 )

@@ -45,6 +45,44 @@
             android:layout_marginTop="8dp"
             android:text="@string/toggle_stretch" />
 
+        <LinearLayout
+            android:id="@+id/stretch_duration_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/stretch_duration_label"
+                android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+            <RadioGroup
+                android:id="@+id/rg_stretch_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rb_stretch_5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stretch_5_min" />
+
+                <RadioButton
+                    android:id="@+id/rb_stretch_10"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="@string/stretch_10_min" />
+
+            </RadioGroup>
+
+        </LinearLayout>
+
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/switch_placeholder"
             android:layout_width="match_parent"

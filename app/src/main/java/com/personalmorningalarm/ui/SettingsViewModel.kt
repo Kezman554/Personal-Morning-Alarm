@@ -23,4 +23,12 @@ class SettingsViewModel(private val repository: AlarmRepository) : ViewModel() {
             }
         }
     }
+
+    fun setStretchDuration(minutes: Int) {
+        viewModelScope.launch {
+            repository.getContentToggle(ContentType.STRETCH)?.let {
+                repository.updateContentToggle(it.copy(durationMinutes = minutes))
+            }
+        }
+    }
 }

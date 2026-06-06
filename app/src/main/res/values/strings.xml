@@ -56,10 +56,13 @@
     <string name="goal_project">Project work</string>
 
     <!-- Content toggles (Settings) -->
-    <string name="content_section_title">Content screens</string>
+    <string name="content_section_title">Morning Content</string>
     <string name="toggle_quote">Motivational quote</string>
-    <string name="toggle_stretch">Stretching</string>
+    <string name="toggle_stretch">Stretching prompt</string>
     <string name="toggle_placeholder">Daily goal (placeholder)</string>
+    <string name="stretch_duration_label">Stretch duration</string>
+    <string name="stretch_5_min">5 min</string>
+    <string name="stretch_10_min">10 min</string>
 
     <!-- Stage 2 countdown service -->
     <string name="countdown_channel_name">Stage 2 countdown</string>

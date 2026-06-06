@@ -76,6 +76,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private var stage2StartMs = 0L
 
     private var stage2DurationMinutes = DEFAULT_STAGE2_MINUTES
+    private var stretchDurationMinutes = DEFAULT_STRETCH_MINUTES
     private var morningGoal = MorningGoal.EXERCISE
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -211,15 +212,18 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val tags = repository.getActiveNfcTags()
-            val enabledTypes = repository.getEnabledContentToggles().map { it.contentType }
-            contentScreenManager = ContentScreenManager(enabledTypes)
+            val enabledToggles = repository.getEnabledContentToggles()
+            contentScreenManager = ContentScreenManager(enabledToggles.map { it.contentType })
+            stretchDurationMinutes = enabledToggles
+                .firstOrNull { it.contentType == ContentType.STRETCH }
+                ?.durationMinutes ?: DEFAULT_STRETCH_MINUTES
             if (tags.isEmpty() || nfcAdapter?.isEnabled != true) {
                 Log.d(TAG, "Stage 2: no usable NFC tags — falling back to confirm button")
                 setupFallbackConfirm()
             } else {
                 checkpointManager = NfcCheckpointManager(tags)
                 Log.d(TAG, "Stage 2: ${tags.size} checkpoints, tap order randomised; " +
-                    "content types=$enabledTypes")
+                    "content=${enabledToggles.map { it.contentType }}, stretch=${stretchDurationMinutes}m")
                 enableNfcDispatch()
                 showCheckpoint()
                 promptUnlockIfNeeded()
@@ -303,7 +307,8 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.contentHeading.text = getString(R.string.content_stretch_heading)
         binding.contentBody.text = getString(R.string.stretch_suggestions)
         binding.contentTimer.visibility = View.VISIBLE
-        stretchTimer = object : CountDownTimer(STRETCH_DURATION_MS, 1000L) {
+        val stretchMs = stretchDurationMinutes * 60 * 1000L
+        stretchTimer = object : CountDownTimer(stretchMs, 1000L) {
             override fun onTick(msLeft: Long) {
                 binding.contentTimer.text = CountdownService.formatTime((msLeft / 1000L).toInt())
             }
@@ -452,12 +457,9 @@ class AlarmDismissalActivity : AppCompatActivity() {
         private const val TARGET_SECONDS =
             (ShakeChallenge.DEFAULT_TARGET_DURATION_MS / 1000).toInt()
         private const val DEFAULT_STAGE2_MINUTES = 10
+        private const val DEFAULT_STRETCH_MINUTES = 5
         private const val SUCCESS_DELAY_MS = 1200L
         private const val DONE_DELAY_MS = 2000L
-
-        // Stretch screen timer. Default 5 min (PRD: 5/10 min); the Continue button
-        // skips it. TODO: make configurable from settings.
-        private const val STRETCH_DURATION_MS = 5 * 60 * 1000L
         private const val WRONG_PULSE_MS = 150L
 
         private const val COLOR_RED = 0xFFD32F2F.toInt()

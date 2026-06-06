@@ -47,11 +47,17 @@ class SettingsFragment : Fragment() {
             viewModel.setContentEnabled(ContentType.QUOTE, binding.switchQuote.isChecked)
         }
         binding.switchStretch.setOnClickListener {
-            viewModel.setContentEnabled(ContentType.STRETCH, binding.switchStretch.isChecked)
+            val enabled = binding.switchStretch.isChecked
+            viewModel.setContentEnabled(ContentType.STRETCH, enabled)
+            binding.stretchDurationGroup.visibility = if (enabled) View.VISIBLE else View.GONE
         }
         binding.switchPlaceholder.setOnClickListener {
             viewModel.setContentEnabled(ContentType.PLACEHOLDER, binding.switchPlaceholder.isChecked)
         }
+
+        // onClick (not the group's checked-change) so programmatic updates don't loop.
+        binding.rbStretch5.setOnClickListener { viewModel.setStretchDuration(5) }
+        binding.rbStretch10.setOnClickListener { viewModel.setStretchDuration(10) }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -59,7 +65,15 @@ class SettingsFragment : Fragment() {
                     toggles.forEach { t ->
                         when (t.contentType) {
                             ContentType.QUOTE -> binding.switchQuote.isChecked = t.isEnabled
-                            ContentType.STRETCH -> binding.switchStretch.isChecked = t.isEnabled
+                            ContentType.STRETCH -> {
+                                binding.switchStretch.isChecked = t.isEnabled
+                                binding.stretchDurationGroup.visibility =
+                                    if (t.isEnabled) View.VISIBLE else View.GONE
+                                binding.rgStretchDuration.check(
+                                    if (t.durationMinutes == 10) R.id.rb_stretch_10
+                                    else R.id.rb_stretch_5
+                                )
+                            }
                             ContentType.PLACEHOLDER -> binding.switchPlaceholder.isChecked = t.isEnabled
                         }
                     }
