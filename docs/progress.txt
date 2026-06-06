@@ -300,4 +300,6 @@
     the timer keeping remaining seconds; resume restarts from there.
   - AlarmDismissalActivity: pause on showContentScreen, resume on onContentContinue.
     So the deadline only counts time spent finding/tapping checkpoints, not content.
-  - Builds; NOT yet device-verified (needs a Stage 2 run to watch the freeze)
+  - VERIFIED on device (Nick): stretch shown -> "Countdown paused at 579s";
+    after ~2 min on the stretch screen -> "Countdown resumed at 579s" (frozen,
+    9:40 as expected). Quote pause confirmed too (584s -> 584s)
