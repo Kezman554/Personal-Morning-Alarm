@@ -291,3 +291,13 @@
   - NOT re-tested: full Stage 2 run confirming a disabled toggle drops its content
     + the 10-min stretch taking effect (wired via getEnabledContentToggles; needs
     a shake-through)
+
+2026-06-06  Pause Stage 2 countdown during content screens (Nick's catch)
+  - Bug Nick spotted: the Stage 2 countdown (default 10 min) kept running during
+    the stretch screen (up to 10 min), so a long stretch would expire the timer
+    and (once built) trigger the nuclear alarm mid-stretch — through no fault.
+  - CountdownService: added pause()/resume() (ACTION_PAUSE/RESUME). pause cancels
+    the timer keeping remaining seconds; resume restarts from there.
+  - AlarmDismissalActivity: pause on showContentScreen, resume on onContentContinue.
+    So the deadline only counts time spent finding/tapping checkpoints, not content.
+  - Builds; NOT yet device-verified (needs a Stage 2 run to watch the freeze)

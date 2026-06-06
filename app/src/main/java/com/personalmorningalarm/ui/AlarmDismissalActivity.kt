@@ -275,6 +275,9 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     private fun showContentScreen(type: ContentType) {
         showingContent = true
+        // Freeze the Stage 2 deadline while content shows — content time shouldn't
+        // count against the nuclear timer (a 10-min stretch must not fail you).
+        CountdownService.pause(this)
         binding.content.visibility = View.GONE
         binding.contentPanel.visibility = View.VISIBLE
         binding.contentAuthor.visibility = View.GONE
@@ -330,6 +333,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
         showingContent = false
         binding.contentPanel.visibility = View.GONE
         binding.content.visibility = View.VISIBLE
+        CountdownService.resume(this) // restart the Stage 2 deadline
         showCheckpoint()
     }
 

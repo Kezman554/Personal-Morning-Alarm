@@ -48,9 +48,19 @@ class CountdownService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_PAUSE -> {
+                pauseTimer()
+                return START_STICKY
+            }
+            ACTION_RESUME -> {
+                resumeTimer()
+                return START_STICKY
+            }
         }
 
         val explicitSeconds = intent?.getIntExtra(EXTRA_DURATION_SECONDS, -1) ?: -1
@@ -84,6 +94,23 @@ class CountdownService : Service() {
         _remainingSeconds.value = 0
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    /** Freezes the countdown (e.g. while a content screen is showing). */
+    private fun pauseTimer() {
+        timer?.cancel()
+        timer = null
+        Log.d(TAG, "Countdown paused at ${_remainingSeconds.value}s")
+    }
+
+    /** Resumes from the frozen remaining time. */
+    private fun resumeTimer() {
+        if (timer != null) return // already running
+        val remaining = _remainingSeconds.value
+        if (remaining > 0) {
+            Log.d(TAG, "Countdown resumed at ${remaining}s")
+            startTimer(remaining)
+        }
     }
 
     private fun startTimer(totalSeconds: Int) {
@@ -155,6 +182,8 @@ class CountdownService : Service() {
 
         const val EXTRA_DURATION_SECONDS = "extra_duration_seconds"
         const val ACTION_STOP = "com.personalmorningalarm.action.STOP_COUNTDOWN"
+        const val ACTION_PAUSE = "com.personalmorningalarm.action.PAUSE_COUNTDOWN"
+        const val ACTION_RESUME = "com.personalmorningalarm.action.RESUME_COUNTDOWN"
         const val ACTION_COUNTDOWN_EXPIRED = "com.personalmorningalarm.action.COUNTDOWN_EXPIRED"
 
         private val _remainingSeconds = MutableStateFlow(0)
@@ -175,8 +204,22 @@ class CountdownService : Service() {
         }
 
         fun stop(context: Context) {
+            sendAction(context, ACTION_STOP)
+        }
+
+        /** Pause the countdown (call while a content screen is showing). */
+        fun pause(context: Context) {
+            sendAction(context, ACTION_PAUSE)
+        }
+
+        /** Resume the countdown from where it was paused. */
+        fun resume(context: Context) {
+            sendAction(context, ACTION_RESUME)
+        }
+
+        private fun sendAction(context: Context, action: String) {
             val intent = Intent(context, CountdownService::class.java).apply {
-                action = ACTION_STOP
+                this.action = action
             }
             context.startService(intent)
         }
