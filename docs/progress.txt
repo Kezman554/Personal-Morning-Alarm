@@ -303,3 +303,16 @@
   - VERIFIED on device (Nick): stretch shown -> "Countdown paused at 579s";
     after ~2 min on the stretch screen -> "Countdown resumed at 579s" (frozen,
     9:40 as expected). Quote pause confirmed too (584s -> 584s)
+
+2026-06-06  Stage 2 success flow (streak + success screen)
+  - onStage2Complete now: stops CountdownService, clears all app notifications
+    (NotificationManager.cancelAll), records the AlarmEvent (stage1+stage2 success
+    + time), computes current streak, and shows a success screen: "Great job!" +
+    "Day X of your streak!" + a morning-goal reminder. Auto-dismiss after 5s or tap
+  - Streak via repository.getCurrentStreak() after the event is written
+  - VERIFIED on device: notifications cleared (Nick confirmed); log showed "Stage 2
+    success logged (36 s)" + "streak now 1" (correct — 06-05 was all aborts, so
+    today is a fresh Day 1). BUT Nick didn't see the on-screen stat — likely a
+    stray tap dismissed the success screen instantly (whole screen was tap-to-
+    dismiss). FIX: tap-to-dismiss now only activates after a 1.5s grace period so
+    the screen stays readable. Needs a re-confirm next run

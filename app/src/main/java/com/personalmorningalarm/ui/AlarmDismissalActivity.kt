@@ -2,6 +2,7 @@ package com.personalmorningalarm.ui
 
 import android.animation.ArgbEvaluator
 import android.app.KeyguardManager
+import android.app.NotificationManager
 import android.content.Context
 import android.nfc.NfcAdapter
 import android.os.Build
@@ -50,6 +51,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     private val argbEvaluator = ArgbEvaluator()
     private var vibrator: Vibrator? = null
+    private val dismissRunnable = Runnable { dismissToHome() }
 
     private var nfcAdapter: NfcAdapter? = null
     private var checkpointManager: NfcCheckpointManager? = null
@@ -141,6 +143,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stretchTimer?.cancel()
+        binding.root.removeCallbacks(dismissRunnable)
         isSessionActive = false
     }
 
@@ -344,39 +347,69 @@ class AlarmDismissalActivity : AppCompatActivity() {
         // the activity pauses — otherwise a lingering chip gets grabbed by the
         // system's own NFC popup. onPause/onDestroy disables it.
         CountdownService.stop(this)
-        logStage2Success(seconds)
+        clearAlarmNotifications()
 
-        binding.tvCheckpoint.visibility = View.GONE
+        // Base success screen; the streak line fills in once it's computed.
         binding.tvCountdown.visibility = View.GONE
         binding.tvFeedback.visibility = View.GONE
         binding.btnConfirm.visibility = View.GONE
-        binding.tvTitle.text = getString(R.string.stage2_complete)
+        binding.tvCheckpoint.visibility = View.GONE
+        binding.tvTitle.text = getString(R.string.success_title)
         binding.root.setBackgroundColor(COLOR_GREEN)
 
-        binding.root.postDelayed({ finish() }, DONE_DELAY_MS)
+        lifecycleScope.launch {
+            recordStage2Success(seconds)
+            val streak = repository.getCurrentStreak()
+            binding.tvSeconds.visibility = View.VISIBLE
+            binding.tvSeconds.text = getString(R.string.streak_format, streak)
+            binding.tvFeedback.visibility = View.VISIBLE
+            binding.tvFeedback.text = goalReminder()
+            Log.d(TAG, "Stage 2 success — streak now $streak")
+        }
+
+        // Auto-dismiss after 5s. Tap-to-dismiss only activates after a short grace
+        // period so a stray touch right after the final tag doesn't skip the screen.
+        binding.root.postDelayed(dismissRunnable, SUCCESS_SCREEN_MS)
+        binding.root.postDelayed({
+            binding.root.setOnClickListener {
+                binding.root.removeCallbacks(dismissRunnable)
+                dismissToHome()
+            }
+        }, TAP_GRACE_MS)
     }
 
-    private fun logStage2Success(seconds: Int) {
-        lifecycleScope.launch {
-            val today = LocalDate.now().toString()
-            val existing = repository.getEventByDate(today)
-            if (existing != null) {
-                repository.updateEvent(
-                    existing.copy(stage2Success = true, stage2TimeSeconds = seconds)
+    private suspend fun recordStage2Success(seconds: Int) {
+        val today = LocalDate.now().toString()
+        val existing = repository.getEventByDate(today)
+        if (existing != null) {
+            repository.updateEvent(
+                existing.copy(stage2Success = true, stage2TimeSeconds = seconds)
+            )
+        } else {
+            repository.recordEvent(
+                AlarmEvent(
+                    date = today,
+                    stage1Success = true,
+                    stage2Success = true,
+                    stage2TimeSeconds = seconds,
+                    morningGoal = morningGoal
                 )
-            } else {
-                repository.recordEvent(
-                    AlarmEvent(
-                        date = today,
-                        stage1Success = true,
-                        stage2Success = true,
-                        stage2TimeSeconds = seconds,
-                        morningGoal = morningGoal
-                    )
-                )
-            }
-            Log.d(TAG, "Stage 2 success logged ($seconds s)")
+            )
         }
+        Log.d(TAG, "Stage 2 success logged ($seconds s)")
+    }
+
+    private fun goalReminder(): String = when (morningGoal) {
+        MorningGoal.EXERCISE -> getString(R.string.goal_reminder_exercise)
+        MorningGoal.PROJECT -> getString(R.string.goal_reminder_project)
+    }
+
+    private fun clearAlarmNotifications() {
+        getSystemService(NotificationManager::class.java).cancelAll()
+    }
+
+    private fun dismissToHome() {
+        if (!isFinishing) finish()
     }
 
     private fun observeCountdown() {
@@ -463,7 +496,8 @@ class AlarmDismissalActivity : AppCompatActivity() {
         private const val DEFAULT_STAGE2_MINUTES = 10
         private const val DEFAULT_STRETCH_MINUTES = 5
         private const val SUCCESS_DELAY_MS = 1200L
-        private const val DONE_DELAY_MS = 2000L
+        private const val SUCCESS_SCREEN_MS = 5000L
+        private const val TAP_GRACE_MS = 1500L
         private const val WRONG_PULSE_MS = 150L
 
         private const val COLOR_RED = 0xFFD32F2F.toInt()

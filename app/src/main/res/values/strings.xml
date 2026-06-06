@@ -43,6 +43,10 @@
     <string name="wrong_tag">Wrong tag — find %1$s</string>
     <string name="tap_to_confirm">Tap to confirm</string>
     <string name="stage2_complete">All done — great job!</string>
+    <string name="success_title">Great job!</string>
+    <string name="streak_format">Day %1$d of your streak!</string>
+    <string name="goal_reminder_exercise">Time to exercise</string>
+    <string name="goal_reminder_project">Time for project work</string>
     <string name="nfc_unlock_hint">Unlock your phone to tap the tags</string>
 
     <!-- Content screens -->
