@@ -31,7 +31,7 @@
     <string name="alarm_channel_name">Alarm</string>
     <string name="alarm_channel_description">Plays the morning alarm</string>
     <string name="alarm_notification_title">Wake up</string>
-    <string name="alarm_notification_text">Tap to dismiss the alarm</string>
+    <string name="alarm_notification_text">Shake your phone to dismiss</string>
     <string name="alarm_dismissal_title">Wake up</string>
     <string name="shake_instruction">Shake hard to wake up</string>
     <string name="shake_progress_format">%1$d%%</string>

@@ -11,10 +11,12 @@ import kotlin.math.sqrt
 
 /**
  * Stage 1 challenge: dismiss by vigorously shaking the phone for a cumulative
- * [targetDurationMs] (default 15s). "Shaking" is a large change in acceleration
- * magnitude between samples (gravity cancels out in the delta), so orientation
- * doesn't matter. Time only accrues while actively shaking; a short pause
- * tolerance bridges the brief low-motion instant at each shake reversal.
+ * [targetDurationMs] (default 15s). "Shaking" is when the acceleration magnitude
+ * deviates from gravity by more than [shakeThreshold] m/s^2 — a force measure
+ * that's independent of sensor sample rate (the old delta-between-samples method
+ * broke when the accelerometer was throttled coming out of Doze) and of
+ * orientation. Time only accrues while actively shaking; a short pause tolerance
+ * bridges the brief low-motion instant at each shake reversal.
  */
 class ShakeChallenge(
     context: Context,
@@ -33,7 +35,6 @@ class ShakeChallenge(
     private var running = false
     private var completed = false
 
-    private var lastMagnitude = 0f
     private var lastSampleTime = 0L
     private var lastShakeTime = 0L
     private var accumulatedShakeMs = 0L
@@ -48,16 +49,17 @@ class ShakeChallenge(
         // Re-baseline timing only — accumulated progress is preserved across
         // stop/start so a pause (e.g. switching shaking arms) doesn't lose it.
         lastSampleTime = 0L
-        lastMagnitude = 0f
         lastShakeTime = 0L
         running = true
+        // GAME rate (~50Hz) is plenty for force-based detection and needs no
+        // permission. (FASTEST/0us requires HIGH_SAMPLING_RATE_SENSORS on API 31+
+        // and crashed registerListener.)
         sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
     }
 
     /** Clears accumulated progress so the challenge can run from scratch. */
     fun reset() {
         completed = false
-        lastMagnitude = 0f
         lastSampleTime = 0L
         lastShakeTime = 0L
         accumulatedShakeMs = 0L
@@ -76,18 +78,18 @@ class ShakeChallenge(
         val y = event.values[1]
         val z = event.values[2]
         val magnitude = sqrt(x * x + y * y + z * z)
+        // Force measure: how far total acceleration is from gravity. ~0 at rest,
+        // large during a shake, independent of sample rate and orientation.
+        val linearAccel = abs(magnitude - GRAVITY)
         val now = System.currentTimeMillis()
 
-        // First sample only establishes baselines; nothing to accumulate yet.
+        // First sample only establishes the timing baseline.
         if (lastSampleTime == 0L) {
-            lastMagnitude = magnitude
             lastSampleTime = now
             return
         }
 
-        val delta = abs(magnitude - lastMagnitude)
-        lastMagnitude = magnitude
-        if (delta > shakeThreshold) {
+        if (linearAccel > shakeThreshold) {
             lastShakeTime = now
         }
 
@@ -116,10 +118,13 @@ class ShakeChallenge(
     companion object {
         private const val TAG = "PMA"
 
-        // Tuned down across on-device tests: 15.0f then 8.0f both needed
-        // near-maximal effort (only ~11% of vigorous shaking counted at 8.0f).
-        // 4.0f registers a comfortable shake; raise if it becomes too easy.
-        const val DEFAULT_SHAKE_THRESHOLD = 4.0f
+        /** Standard gravity (m/s^2); subtracted from the magnitude to get net force. */
+        private const val GRAVITY = 9.80665f
+
+        // Force threshold (m/s^2 deviation from gravity). Switched from the old
+        // delta-between-samples method, which stalled when the sensor was
+        // throttled out of Doze. 3.5f registers a moderate, comfortable shake.
+        const val DEFAULT_SHAKE_THRESHOLD = 3.5f
         const val DEFAULT_TARGET_DURATION_MS = 15_000L
 
         /**

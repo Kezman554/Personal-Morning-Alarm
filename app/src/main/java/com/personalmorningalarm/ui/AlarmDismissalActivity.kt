@@ -73,8 +73,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     private var stage = STAGE_1
     private var lastLoggedBucket = -1
-    private var lastProgress = 0f
-    private var lastPulseTime = 0L
     private var stage2StartMs = 0L
 
     private var stage2DurationMinutes = DEFAULT_STAGE2_MINUTES
@@ -155,7 +153,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.tvSeconds.text = getString(R.string.seconds_format, remaining)
 
         updateBackground(progress)
-        pulseIfShaking(progress)
 
         val bucket = percent / 25
         if (bucket != lastLoggedBucket) {
@@ -177,17 +174,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.tvTitle.text = getString(R.string.stage1_success)
         binding.tvSeconds.visibility = View.GONE
         binding.root.postDelayed({ startStage2() }, SUCCESS_DELAY_MS)
-    }
-
-    private fun pulseIfShaking(progress: Float) {
-        if (progress > lastProgress) {
-            val now = SystemClock.uptimeMillis()
-            if (now - lastPulseTime >= PULSE_INTERVAL_MS) {
-                lastPulseTime = now
-                vibrator?.vibrate(VibrationEffect.createOneShot(PULSE_MS, VibrationEffect.DEFAULT_AMPLITUDE))
-            }
-        }
-        lastProgress = progress
     }
 
     private fun updateBackground(progress: Float) {
@@ -472,8 +458,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
         // Stretch screen timer. Default 5 min (PRD: 5/10 min); the Continue button
         // skips it. TODO: make configurable from settings.
         private const val STRETCH_DURATION_MS = 5 * 60 * 1000L
-        private const val PULSE_INTERVAL_MS = 200L
-        private const val PULSE_MS = 30L
         private const val WRONG_PULSE_MS = 150L
 
         private const val COLOR_RED = 0xFFD32F2F.toInt()

@@ -252,3 +252,25 @@
   - SettingsViewModel trimmed to content toggles; tag CRUD lives in NfcTagsViewModel
   - VERIFIED on device: Settings shows Manage button + 3 toggles (no list); tapping
     opens the tags page ("Active tags: 3" — Nick's 3rd tag); Back returns to Settings
+
+2026-06-06  Shake detection rewrite + crash fix + content screens verified
+  - ROOT CAUSE of recurring shake pain: delta-between-samples detection is
+    rate-sensitive and aliases against the vibration motor — under-registered real
+    shakes. Rewrote ShakeChallenge to FORCE-based: |accel magnitude - gravity| >
+    threshold (3.5 m/s^2), independent of sample rate and orientation
+  - CRASH fix: had switched to SENSOR_DELAY_FASTEST, which needs
+    HIGH_SAMPLING_RATE_SENSORS on API 31+ and threw SecurityException ->
+    AlarmDismissalActivity crashed on resume (this, not a vibration self-trigger,
+    was the "alarm turned itself off" on 06-05 AND 06-06). Reverted to
+    SENSOR_DELAY_GAME (~50Hz, no permission)
+  - Removed Stage 1 vibration from AlarmService: force-based detection would read
+    the motor as shaking; sound-only also keeps Stage 1 gentle (PRD). Also removed
+    the activity's shake haptic pulses (same feedback risk)
+  - Notification tap mid-shake reset progress: AlarmService full-screen intent used
+    FLAG_ACTIVITY_CLEAR_TASK, recreating the activity. Removed it; singleTask now
+    reuses the instance. Notification text -> "Shake your phone to dismiss"
+  - VERIFIED on device (Nick): shake felt right ("small deliberate effort"); diag
+    showed ~50Hz, 0.0 m/s^2 at rest (no false trigger), 53-103 m/s^2 while shaking
+    (threshold 3.5 has big headroom). Quote + Stretch content screens both appeared.
+    Full Stage 1 -> content -> Stage 2 flow works end to end
+  - Diagnostics logging removed after tuning

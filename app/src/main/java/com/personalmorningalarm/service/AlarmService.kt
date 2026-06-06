@@ -13,24 +13,24 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.personalmorningalarm.R
 import com.personalmorningalarm.ui.AlarmDismissalActivity
 
 /**
- * Foreground service that drives the Stage 1 alarm: plays a looping alarm tone,
- * vibrates, and surfaces [AlarmDismissalActivity] over the lock screen via a
+ * Foreground service that drives the Stage 1 alarm: plays a looping alarm tone
+ * and surfaces [AlarmDismissalActivity] over the lock screen via a
  * full-screen-intent notification (the reliable way to launch an activity from
  * the background on API 29+).
+ *
+ * Stage 1 does NOT vibrate: shake detection is force-based and would read the
+ * vibration motor as "shaking" and auto-dismiss. Sound-only also keeps Stage 1
+ * gentle (PRD: don't wake a partner). Strong vibration belongs to the nuclear alarm.
  */
 class AlarmService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
-    private var vibrator: Vibrator? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -49,7 +49,6 @@ class AlarmService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         isRunning = true
         startAlarmSound()
-        startVibration()
         return START_STICKY
     }
 
@@ -61,16 +60,17 @@ class AlarmService : Service() {
             release()
         }
         mediaPlayer = null
-        vibrator?.cancel()
-        vibrator = null
         super.onDestroy()
     }
 
     private fun buildNotification(): Notification {
         // Full-screen intent: launches the dismissal activity directly when the
         // device is locked/asleep, otherwise shows as a heads-up notification.
+        // No CLEAR_TASK: with the activity's singleTask launch mode, re-launching
+        // (e.g. tapping the notification mid-shake) reuses the existing instance
+        // instead of recreating it and resetting shake progress.
         val fullScreenIntent = Intent(this, AlarmDismissalActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(
             this,
@@ -111,24 +111,6 @@ class AlarmService : Service() {
             Log.e(TAG, "Failed to start alarm sound", e)
         }
     }
-
-    private fun startVibration() {
-        val vib = getVibrator() ?: return
-        if (!vib.hasVibrator()) return
-        // 0.5s on, 0.5s off, repeating from index 0.
-        val pattern = longArrayOf(0, 500, 500)
-        vib.vibrate(VibrationEffect.createWaveform(pattern, 0))
-        vibrator = vib
-    }
-
-    private fun getVibrator(): Vibrator? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            manager?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
