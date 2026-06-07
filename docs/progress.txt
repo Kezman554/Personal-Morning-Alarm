@@ -316,3 +316,5 @@
     stray tap dismissed the success screen instantly (whole screen was tap-to-
     dismiss). FIX: tap-to-dismiss now only activates after a 1.5s grace period so
     the screen stays readable. Needs a re-confirm next run
+  - RE-CONFIRMED on device after grace fix: Nick saw the success screen with the
+    streak line ("Day X of your streak!"). Stage 2 success flow complete
