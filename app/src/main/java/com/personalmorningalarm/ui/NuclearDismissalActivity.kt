@@ -3,31 +3,72 @@ package com.personalmorningalarm.ui
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.view.View
 import android.view.WindowManager
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.personalmorningalarm.R
+import com.personalmorningalarm.challenge.MathChallenge
+import com.personalmorningalarm.challenge.NfcChallenge
+import com.personalmorningalarm.challenge.ShakeChallenge
+import com.personalmorningalarm.challenge.TypingChallenge
+import com.personalmorningalarm.data.AlarmRepository
+import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.entity.AlarmEvent
+import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.databinding.ActivityNuclearDismissalBinding
 import com.personalmorningalarm.service.NuclearAlarmService
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /**
- * The nuclear-alarm screen (Stage 2 failure). Shows over the lock screen and is
- * deliberately hard to escape:
- *  - Back button is swallowed.
- *  - HOME/recents can't be blocked outright on stock Android, so we relaunch
- *    ourselves when the user leaves ([onUserLeaveHint]); the nuclear screen
- *    snaps back to the front.
- *  - The foreground-service notification is ongoing, so it can't be swiped away.
+ * The nuclear-alarm dismissal gauntlet (Stage 2 failure). Shows all four
+ * challenges at once — extended 30s shake, an arithmetic problem, an NFC tap,
+ * and a typed confirmation phrase — each with a ✓/○ status. They can be done in
+ * any order; the alarm is only silenced once ALL four are complete.
  *
- * The full dismissal gauntlet (30s shake + math + NFC + typed phrase) is the
- * next task; for now a temporary Stop button ends a test run.
+ * Reaching this screen IS the failure, so the failed wake-up is logged (and the
+ * streak reset) on entry, not on completion.
+ *
+ * Hard to escape: back/recents are swallowed and the sound/vibration/strobe run
+ * in [NuclearAlarmService] independent of this activity. HOME can't be blocked on
+ * stock Android (see progress log).
  */
 class NuclearDismissalActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityNuclearDismissalBinding
+    private lateinit var repository: AlarmRepository
+
+    private lateinit var shakeChallenge: ShakeChallenge
+    private val mathChallenge = MathChallenge()
+    private lateinit var typingChallenge: TypingChallenge
+    private var nfcChallenge: NfcChallenge? = null
+
+    private var shakeDone = false
+    private var mathDone = false
+    private var nfcDone = false
+    private var typeDone = false
+    private var dismissing = false
+
+    private var morningGoal = MorningGoal.EXERCISE
+
+    private var nfcAdapter: NfcAdapter? = null
+    private val keyguardManager: KeyguardManager by lazy {
+        getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+    }
+
+    // Reader mode (binder thread) — reliable for consecutive reads on this Samsung.
+    private val readerCallback = NfcAdapter.ReaderCallback { tag ->
+        val tagId = tag.id.toHex()
+        runOnUiThread { onNfcTag(tagId) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,41 +77,198 @@ class NuclearDismissalActivity : AppCompatActivity() {
         binding = ActivityNuclearDismissalBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        repository = AlarmRepository(AppDatabase.getInstance(this))
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+        typingChallenge = TypingChallenge(getString(R.string.nuclear_phrase))
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // Swallowed — nuclear can't be escaped with the back button.
             }
         })
 
-        // TODO(temporary): until the dismissal challenges are built, this ends a
-        // test run so the alarm can be silenced without a force-stop.
-        binding.btnStopNuclear.setOnClickListener {
-            Log.d(TAG, "Nuclear stopped via temp button")
+        setupShake()
+        setupMath()
+        setupTyping()
+        setupNfc()
+
+        // Reaching the nuclear screen is the failure: log it and reset the streak
+        // up front, so it stands even if the user never completes the gauntlet.
+        lifecycleScope.launch {
+            morningGoal = repository.getCurrentConfig()?.morningGoal ?: MorningGoal.EXERCISE
+            recordNuclearFailure()
+            Log.d(TAG, "Nuclear failure recorded; current streak now ${repository.getCurrentStreak()}")
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!shakeDone) shakeChallenge.start()
+        if (!nfcDone && nfcChallenge?.hasNoTags == false) {
+            enableNfcReader()
+            updateNfcHintForKeyguard()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        shakeChallenge.stop()
+        disableNfcReader()
+    }
+
+    // --- Challenge setup ---
+
+    private fun setupShake() {
+        shakeChallenge = ShakeChallenge(this, targetDurationMs = SHAKE_DURATION_MS).apply {
+            onProgress = { binding.shakeProgress.progress = (it * 100).toInt() }
+            onComplete = {
+                binding.shakeProgress.progress = 100
+                shakeDone = true
+                markDone(binding.statusShake)
+                Log.d(TAG, "Nuclear shake complete")
+            }
+        }
+    }
+
+    private fun setupMath() {
+        binding.tvMathQuestion.text = getString(R.string.math_question_format, mathChallenge.questionText)
+        binding.btnMathSubmit.setOnClickListener {
+            if (mathChallenge.isCorrect(binding.etMath.text.toString())) {
+                mathDone = true
+                binding.etMath.isEnabled = false
+                binding.btnMathSubmit.isEnabled = false
+                markDone(binding.statusMath)
+                Log.d(TAG, "Nuclear math correct")
+            } else {
+                binding.etMath.error = getString(R.string.math_wrong)
+            }
+        }
+    }
+
+    private fun setupTyping() {
+        binding.tvTypePhrase.text = typingChallenge.phrase
+        binding.btnTypeSubmit.setOnClickListener {
+            if (typingChallenge.matches(binding.etType.text.toString())) {
+                typeDone = true
+                binding.etType.isEnabled = false
+                binding.btnTypeSubmit.isEnabled = false
+                markDone(binding.statusType)
+                Log.d(TAG, "Nuclear typing correct")
+            } else {
+                binding.etType.error = getString(R.string.type_wrong)
+            }
+        }
+    }
+
+    private fun setupNfc() {
+        lifecycleScope.launch {
+            val tagIds = repository.getActiveNfcTags().map { it.tagId }
+            val challenge = NfcChallenge(tagIds)
+            nfcChallenge = challenge
+            if (challenge.hasNoTags || nfcAdapter?.isEnabled != true) {
+                // Nothing to tap (no tags or NFC off) — don't trap the user.
+                nfcDone = true
+                binding.tvNfcHint.text = getString(R.string.nfc_no_tags_skipped)
+                markDone(binding.statusNfc)
+                Log.d(TAG, "Nuclear NFC auto-completed (no usable tags)")
+            } else {
+                enableNfcReader()
+                updateNfcHintForKeyguard()
+            }
+        }
+    }
+
+    private fun onNfcTag(tagId: String) {
+        val challenge = nfcChallenge ?: return
+        if (nfcDone) return
+        if (challenge.isRegistered(tagId)) {
+            nfcDone = true
+            binding.tvNfcHint.text = getString(R.string.nfc_accepted)
+            disableNfcReader()
+            markDone(binding.statusNfc)
+            Log.d(TAG, "Nuclear NFC tag accepted")
+        } else {
+            binding.tvNfcHint.text = getString(R.string.nfc_wrong_tag)
+        }
+    }
+
+    // --- Completion ---
+
+    /** Marks a status indicator done and checks whether the gauntlet is finished. */
+    private fun markDone(status: TextView) {
+        status.text = getString(R.string.status_done)
+        status.setTextColor(COLOR_DONE)
+        maybeFinish()
+    }
+
+    private fun maybeFinish() {
+        if (shakeDone && mathDone && nfcDone && typeDone && !dismissing) {
+            dismissing = true
+            Log.d(TAG, "All nuclear challenges complete — dismissing")
             NuclearAlarmService.stop(this)
             finish()
         }
     }
 
+    private suspend fun recordNuclearFailure() {
+        val today = LocalDate.now().toString()
+        val existing = repository.getEventByDate(today)
+        if (existing != null) {
+            repository.updateEvent(
+                existing.copy(stage2Success = false, nuclearTriggered = true)
+            )
+        } else {
+            // Reaching Stage 2 means Stage 1 was passed.
+            repository.recordEvent(
+                AlarmEvent(
+                    date = today,
+                    stage1Success = true,
+                    stage2Success = false,
+                    nuclearTriggered = true,
+                    morningGoal = morningGoal
+                )
+            )
+        }
+        Log.d(TAG, "Logged nuclear failure for $today")
+    }
+
+    // --- NFC plumbing ---
+
+    private fun enableNfcReader() {
+        runCatching { nfcAdapter?.enableReaderMode(this, readerCallback, READER_FLAGS, null) }
+    }
+
+    private fun disableNfcReader() {
+        runCatching { nfcAdapter?.disableReaderMode(this) }
+    }
+
+    /** NFC won't deliver taps while the secure keyguard is up — prompt to unlock. */
+    private fun updateNfcHintForKeyguard() {
+        if (keyguardManager.isKeyguardLocked) {
+            binding.tvNfcHint.text = getString(R.string.nfc_unlock_hint)
+            keyguardManager.requestDismissKeyguard(this, null)
+        } else if (!nfcDone) {
+            binding.tvNfcHint.text = getString(R.string.nfc_tap_hint)
+        }
+    }
+
+    // --- Escape blocking / window flags ---
+
     /**
-     * Belt-and-suspenders back blocking: the OnBackPressedCallback above handles
-     * the modern path, this catches the legacy hardware/key path. Also swallow
-     * the recent-apps key. HOME can't be intercepted at all on stock Android.
+     * Belt-and-suspenders back blocking (the dispatcher handles the modern path,
+     * this catches the legacy key path); also swallow recents. HOME can't be
+     * intercepted on stock Android.
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
-            return true // consumed — don't let it leave the nuclear screen
+            return true
         }
         return super.onKeyDown(keyCode, event)
     }
 
-    /**
-     * Pressing HOME (or otherwise leaving) sends us to the background. While the
-     * nuclear service is still running, bring ourselves back to the front so the
-     * alarm can't be dodged by going to the launcher.
-     */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (NuclearAlarmService.isRunning) {
+        if (!dismissing && NuclearAlarmService.isRunning) {
             Log.d(TAG, "User left nuclear screen — relaunching")
             startActivity(
                 Intent(this, NuclearDismissalActivity::class.java).apply {
@@ -98,7 +296,18 @@ class NuclearDismissalActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    private fun ByteArray.toHex(): String = joinToString("") { "%02X".format(it) }
+
     companion object {
         private const val TAG = "PMA"
+        private const val SHAKE_DURATION_MS = 30_000L
+        private const val COLOR_DONE = 0xFF4CAF50.toInt()
+
+        private const val READER_FLAGS =
+            NfcAdapter.FLAG_READER_NFC_A or
+                NfcAdapter.FLAG_READER_NFC_B or
+                NfcAdapter.FLAG_READER_NFC_F or
+                NfcAdapter.FLAG_READER_NFC_V or
+                NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
     }
 }

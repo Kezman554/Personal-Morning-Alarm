@@ -352,3 +352,30 @@
   - Back-button hardening (onKeyDown) added this session but NOT yet re-verified on
     device. OUT OF SCOPE this task (next): the dismissal gauntlet (30s shake + math
     + NFC + typed phrase) and failure logging / streak reset on nuclear
+
+2026-06-07  Nuclear dismissal gauntlet (4 challenges) + failure logging
+  - NuclearDismissalActivity rebuilt: shows all 4 challenges at once, each with a
+    ○ -> ✓ status, completable in ANY order; alarm only silences once all 4 done:
+    * Shake: reuses ShakeChallenge with targetDurationMs=30s
+    * challenge/MathChallenge: random two-digit + or - (subtraction kept non-negative),
+      isCorrect() verifier
+    * challenge/NfcChallenge: tap ANY registered tag (reader mode). Auto-completes if
+      no tags registered or NFC off, so the user can't get trapped
+    * challenge/TypingChallenge: phrase "I am awake and getting up", case- and
+      whitespace-insensitive
+  - Failure logged on ENTRY (reaching the screen IS the failure): records today's
+    AlarmEvent with nuclearTriggered=true, stage2Success=false, so it stands even if
+    the user quits. Streak reset: AlarmRepository.getCurrentStreak now returns 0 when
+    today's event has nuclearTriggered=true (nuclearTriggered column already existed
+    in the v2 schema — no migration needed)
+  - CORRECTED A FALSE LESSON (Nick's catch): the earlier belief that the vibration
+    motor self-triggers the force-based shake was an UNVERIFIED precaution bundled
+    into the 06-06 crash fix; the real self-dismiss cause was the SENSOR_DELAY_FASTEST
+    SecurityException crash. So nuclear now VIBRATES throughout the gauntlet (no
+    pause); briefly added a vibration-pause workaround then removed it. Memory updated
+  - VERIFIED on device (Nick, "all good"): nuclear fired on countdown expiry, all 4
+    challenges completed in arbitrary order, alarm silenced only after the 4th ✓,
+    streak reset. Shake bar did NOT self-fill from the vibration (false lesson
+    confirmed dead). Layout: scrollable cards on black, white text, green ✓ (themes.xml
+    NuclearCard/Status/Input styles)
+  - Temp "Stop nuclear" button removed (gauntlet replaces it)

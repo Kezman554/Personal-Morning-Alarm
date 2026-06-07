@@ -1,55 +1,177 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FF000000"
-    android:padding="24dp">
+    android:fillViewport="true">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
-        app:layout_constraintBottom_toTopOf="@id/btn_stop_nuclear"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        android:padding="24dp">
 
         <TextView
             android:id="@+id/tv_nuclear_title"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="@string/nuclear_title"
-            android:textAppearance="?attr/textAppearanceHeadlineLarge"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
             android:textColor="#FFFF1744"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tv_nuclear_subtitle"
-            android:layout_width="wrap_content"
+            android:id="@+id/tv_nuclear_instruction"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="4dp"
             android:gravity="center"
-            android:text="@string/nuclear_subtitle"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:text="@string/nuclear_instruction"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
             android:textColor="@android:color/white" />
 
+        <!-- 1. Shake -->
+        <LinearLayout style="@style/NuclearCard">
+
+            <LinearLayout style="@style/NuclearCardHeader">
+
+                <TextView
+                    android:id="@+id/status_shake"
+                    style="@style/NuclearStatus"
+                    tools:text="○" />
+
+                <TextView
+                    style="@style/NuclearCardTitle"
+                    android:text="@string/challenge_shake_title" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/shake_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:max="100"
+                android:progress="0" />
+        </LinearLayout>
+
+        <!-- 2. Math -->
+        <LinearLayout style="@style/NuclearCard">
+
+            <LinearLayout style="@style/NuclearCardHeader">
+
+                <TextView
+                    android:id="@+id/status_math"
+                    style="@style/NuclearStatus"
+                    tools:text="○" />
+
+                <TextView
+                    style="@style/NuclearCardTitle"
+                    android:text="@string/challenge_math_title" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_math_question"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@android:color/white"
+                android:textSize="28sp"
+                tools:text="37 + 58 = ?" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/et_math"
+                    style="@style/NuclearInput"
+                    android:layout_weight="1"
+                    android:hint="@string/math_answer_hint"
+                    android:importantForAutofill="no"
+                    android:inputType="numberSigned" />
+
+                <Button
+                    android:id="@+id/btn_math_submit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/submit" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 3. NFC -->
+        <LinearLayout style="@style/NuclearCard">
+
+            <LinearLayout style="@style/NuclearCardHeader">
+
+                <TextView
+                    android:id="@+id/status_nfc"
+                    style="@style/NuclearStatus"
+                    tools:text="○" />
+
+                <TextView
+                    style="@style/NuclearCardTitle"
+                    android:text="@string/challenge_nfc_title" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_nfc_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/nfc_tap_hint"
+                android:textColor="#FFBBBBBB" />
+        </LinearLayout>
+
+        <!-- 4. Typing -->
+        <LinearLayout style="@style/NuclearCard">
+
+            <LinearLayout style="@style/NuclearCardHeader">
+
+                <TextView
+                    android:id="@+id/status_type"
+                    style="@style/NuclearStatus"
+                    tools:text="○" />
+
+                <TextView
+                    style="@style/NuclearCardTitle"
+                    android:text="@string/challenge_type_title" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_type_phrase"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/nuclear_phrase"
+                android:textColor="@android:color/white"
+                android:textSize="20sp"
+                android:textStyle="italic" />
+
+            <EditText
+                android:id="@+id/et_type"
+                style="@style/NuclearInput"
+                android:layout_width="match_parent"
+                android:layout_marginTop="8dp"
+                android:hint="@string/type_answer_hint"
+                android:importantForAutofill="no"
+                android:inputType="textNoSuggestions" />
+
+            <Button
+                android:id="@+id/btn_type_submit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="8dp"
+                android:text="@string/submit" />
+        </LinearLayout>
+
     </LinearLayout>
-
-    <!-- TODO(temporary): abort control until the nuclear challenge gauntlet exists. -->
-    <Button
-        android:id="@+id/btn_stop_nuclear"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/stop_nuclear_temp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:ignore="HardcodedText" />
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

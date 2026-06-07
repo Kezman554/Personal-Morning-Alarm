@@ -71,6 +71,10 @@ class AlarmRepository(private val db: AppDatabase) {
      * recent success is older than yesterday.
      */
     suspend fun getCurrentStreak(today: LocalDate = LocalDate.now()): Int {
+        // A nuclear failure today breaks the streak immediately — even if
+        // yesterday was a success, the live streak is over.
+        if (alarmEventDao.getByDate(today.toString())?.nuclearTriggered == true) return 0
+
         val successDays = alarmEventDao.getSuccessDatesDesc().map(LocalDate::parse)
         if (successDays.isEmpty()) return 0
 
