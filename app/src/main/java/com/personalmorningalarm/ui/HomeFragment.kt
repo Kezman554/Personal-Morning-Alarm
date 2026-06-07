@@ -1,19 +1,40 @@
 package com.personalmorningalarm.ui
 
+import android.app.TimePickerDialog
 import android.os.Bundle
+import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.personalmorningalarm.R
+import com.personalmorningalarm.data.AlarmRepository
+import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.entity.AlarmConfig
+import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.databinding.FragmentHomeBinding
 import com.personalmorningalarm.service.CountdownService
 import com.personalmorningalarm.util.AlarmScheduler
+import kotlinx.coroutines.launch
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+
+    private val viewModel: HomeViewModel by viewModels {
+        ViewModelFactory(AlarmRepository(AppDatabase.getInstance(requireContext())))
+    }
+
+    private lateinit var scheduler: AlarmScheduler
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -26,29 +47,125 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        scheduler = AlarmScheduler(requireContext())
 
-        // TODO(temporary): dev button to verify alarm scheduling end-to-end.
-        val scheduler = AlarmScheduler(requireContext())
+        binding.tvAlarmTime.setOnClickListener { showTimePicker() }
+
+        // setOnClickListener fires only on user taps (after the checked state
+        // flips), so programmatic state updates below don't loop back.
+        binding.switchEnabled.setOnClickListener { onToggleEnabled(binding.switchEnabled.isChecked) }
+        binding.rbExercise.setOnClickListener { viewModel.setMorningGoal(MorningGoal.EXERCISE) }
+        binding.rbProject.setOnClickListener { viewModel.setMorningGoal(MorningGoal.PROJECT) }
+
+        setupDevTools()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { viewModel.config.collect(::renderConfig) }
+                launch { viewModel.stats.collect(::renderStats) }
+            }
+        }
+    }
+
+    // --- Rendering ---
+
+    private fun renderConfig(config: AlarmConfig?) {
+        val minutes = config?.alarmTime ?: HomeViewModel.DEFAULT_ALARM_MINUTES
+        val enabled = config?.isEnabled == true
+
+        binding.tvAlarmTime.text = formatTime(minutes)
+        binding.switchEnabled.isChecked = enabled
+        binding.tvNextAlarm.text =
+            if (enabled) getString(R.string.home_alarm_set_for, formatTime(minutes))
+            else getString(R.string.home_alarm_off)
+
+        binding.rgGoal.check(
+            if ((config?.morningGoal ?: MorningGoal.EXERCISE) == MorningGoal.PROJECT) {
+                R.id.rb_project
+            } else {
+                R.id.rb_exercise
+            }
+        )
+    }
+
+    private fun renderStats(stats: HomeStats) {
+        binding.tvStreak.text =
+            if (stats.currentStreak == 1) getString(R.string.home_current_streak_one)
+            else getString(R.string.home_current_streak, stats.currentStreak)
+
+        binding.tvWeekRate.text =
+            if (stats.attemptedDays == 0) getString(R.string.home_week_rate_empty)
+            else getString(R.string.home_week_rate, stats.successDays, stats.attemptedDays)
+    }
+
+    // --- Actions ---
+
+    private fun showTimePicker() {
+        val minutes = currentMinutes()
+        TimePickerDialog(
+            requireContext(),
+            { _, hour, minute ->
+                val newMinutes = hour * 60 + minute
+                viewModel.setAlarmTime(newMinutes)
+                // Keep a live alarm in sync with the new time.
+                if (currentEnabled()) scheduleOrPrompt(newMinutes)
+            },
+            minutes / 60,
+            minutes % 60,
+            DateFormat.is24HourFormat(requireContext())
+        ).show()
+    }
+
+    private fun onToggleEnabled(enabled: Boolean) {
+        if (enabled) {
+            if (!scheduler.canScheduleExactAlarms()) {
+                binding.switchEnabled.isChecked = false // can't honour it yet
+                promptForExactAlarmPermission()
+                return
+            }
+            viewModel.setEnabled(true)
+            scheduler.scheduleDailyAlarm(currentMinutes())
+        } else {
+            viewModel.setEnabled(false)
+            scheduler.cancelAlarm()
+        }
+    }
+
+    private fun scheduleOrPrompt(minutes: Int) {
+        if (scheduler.canScheduleExactAlarms()) {
+            scheduler.scheduleDailyAlarm(minutes)
+        } else {
+            promptForExactAlarmPermission()
+        }
+    }
+
+    private fun promptForExactAlarmPermission() {
+        Toast.makeText(requireContext(), R.string.home_exact_alarm_needed, Toast.LENGTH_LONG).show()
+        scheduler.exactAlarmSettingsIntent()?.let { startActivity(it) }
+    }
+
+    private fun currentMinutes(): Int =
+        viewModel.config.value?.alarmTime ?: HomeViewModel.DEFAULT_ALARM_MINUTES
+
+    private fun currentEnabled(): Boolean = viewModel.config.value?.isEnabled == true
+
+    private fun formatTime(minutes: Int): String {
+        val pattern = if (DateFormat.is24HourFormat(requireContext())) "H:mm" else "h:mm a"
+        return LocalTime.of(minutes / 60, minutes % 60)
+            .format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault()))
+    }
+
+    // --- Temporary dev tools ---
+
+    private fun setupDevTools() {
         binding.btnTestAlarm.setOnClickListener {
             if (!scheduler.canScheduleExactAlarms()) {
-                Toast.makeText(
-                    requireContext(),
-                    "Grant 'Alarms & reminders' permission, then tap again",
-                    Toast.LENGTH_LONG
-                ).show()
-                scheduler.exactAlarmSettingsIntent()?.let { startActivity(it) }
+                promptForExactAlarmPermission()
                 return@setOnClickListener
             }
-            val triggerAt = System.currentTimeMillis() + 60_000L
-            scheduler.scheduleAlarm(triggerAt)
-            Toast.makeText(
-                requireContext(),
-                "Test alarm scheduled for 1 minute from now",
-                Toast.LENGTH_SHORT
-            ).show()
+            scheduler.scheduleAlarm(System.currentTimeMillis() + 60_000L)
+            Toast.makeText(requireContext(), "Test alarm in 1 minute", Toast.LENGTH_SHORT).show()
         }
-
-        // TODO(temporary): dev button to verify the Stage 2 countdown in isolation.
         binding.btnTestCountdown.setOnClickListener {
             CountdownService.start(requireContext(), 15)
             Toast.makeText(requireContext(), "15s countdown started", Toast.LENGTH_SHORT).show()

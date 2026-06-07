@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.personalmorningalarm.data.entity.AlarmEvent
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AlarmEventDao {
@@ -25,6 +26,18 @@ interface AlarmEventDao {
 
     @Query("SELECT * FROM alarm_events WHERE date = :date ORDER BY timestamp DESC LIMIT 1")
     suspend fun getByDate(date: String): AlarmEvent?
+
+    /** Reactive stream of all events; used to recompute home-screen stats. */
+    @Query("SELECT * FROM alarm_events ORDER BY date DESC, timestamp DESC")
+    fun observeAll(): Flow<List<AlarmEvent>>
+
+    /** Distinct calendar days with any event on/after [cutoffDate]. */
+    @Query("SELECT COUNT(DISTINCT date) FROM alarm_events WHERE date >= :cutoffDate")
+    suspend fun countAttemptedDaysSince(cutoffDate: String): Int
+
+    /** Distinct successful days (Stage 2 completed) on/after [cutoffDate]. */
+    @Query("SELECT COUNT(DISTINCT date) FROM alarm_events WHERE stage2Success = 1 AND date >= :cutoffDate")
+    suspend fun countSuccessDaysSince(cutoffDate: String): Int
 
     /**
      * Distinct successful days (Stage 2 completed), newest first. Used by the

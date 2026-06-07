@@ -23,6 +23,7 @@ class AlarmRepository(private val db: AppDatabase) {
 
     // --- Alarm config ---
     suspend fun getCurrentConfig(): AlarmConfig? = alarmConfigDao.getCurrent()
+    fun observeCurrentConfig(): Flow<AlarmConfig?> = alarmConfigDao.observeCurrent()
     suspend fun getAllConfigs(): List<AlarmConfig> = alarmConfigDao.getAll()
     suspend fun saveConfig(config: AlarmConfig): Long = alarmConfigDao.insert(config)
     suspend fun updateConfig(config: AlarmConfig) = alarmConfigDao.update(config)
@@ -34,6 +35,7 @@ class AlarmRepository(private val db: AppDatabase) {
     suspend fun deleteEvent(event: AlarmEvent) = alarmEventDao.delete(event)
     suspend fun getAllEvents(): List<AlarmEvent> = alarmEventDao.getAll()
     suspend fun getEventByDate(date: String): AlarmEvent? = alarmEventDao.getByDate(date)
+    fun observeEvents(): Flow<List<AlarmEvent>> = alarmEventDao.observeAll()
 
     // --- NFC tags ---
     suspend fun registerTag(tag: NfcTag): Long = nfcTagDao.insert(tag)
@@ -119,5 +121,17 @@ class AlarmRepository(private val db: AppDatabase) {
     suspend fun getWeeklySuccessRate(today: LocalDate = LocalDate.now()): Float {
         val cutoff = today.minusDays(6).toString()
         return alarmEventDao.getSuccessRateSince(cutoff)
+    }
+
+    /**
+     * Successful days and attempted days over the trailing 7 days (today
+     * inclusive), as a (successDays, attemptedDays) pair — e.g. 4 to 5 renders
+     * as "4/5 days" on the home screen.
+     */
+    suspend fun getWeeklySuccessCounts(today: LocalDate = LocalDate.now()): Pair<Int, Int> {
+        val cutoff = today.minusDays(6).toString()
+        val success = alarmEventDao.countSuccessDaysSince(cutoff)
+        val attempted = alarmEventDao.countAttemptedDaysSince(cutoff)
+        return success to attempted
     }
 }

@@ -379,3 +379,27 @@
     confirmed dead). Layout: scrollable cards on black, white text, green ✓ (themes.xml
     NuclearCard/Status/Input styles)
   - Temp "Stop nuclear" button removed (gauntlet replaces it)
+
+2026-06-07  Home screen (real alarm config + stats)
+  - HomeFragment rebuilt from the placeholder: big tap-to-edit time
+    (TimePickerDialog, respects device 12/24h), enable/disable SwitchMaterial,
+    morning-goal radio (Exercise/Project), status line ("Alarm set for 6:30 AM" /
+    "Alarm off"), current streak, and "This week: X/Y days"
+  - HomeViewModel: config + stats as reactive Flows off Room. config from new
+    AlarmConfigDao.observeCurrent(); stats recomputed on AlarmEventDao.observeAll()
+    emissions (current streak + weekly success/attempted day counts). Edits persist
+    to the SINGLE config row (update-in-place, or create one disabled if none) so
+    rows don't accumulate
+  - Repository/DAO: observeCurrentConfig, observeEvents, getWeeklySuccessCounts
+    (success vs attempted distinct days over trailing 7); DAO countSuccessDaysSince
+    / countAttemptedDaysSince
+  - Scheduling stays in the fragment (has Context + permission flow): enable ->
+    scheduleDailyAlarm, disable -> cancelAlarm, time change while enabled ->
+    reschedule. Missing exact-alarm permission reverts the switch + opens settings
+  - REMOVED the temporary Room smoke test from MainActivity — it inserted a fresh
+    AlarmConfig row every launch, which would clobber the user's saved alarm now
+    that real config UI exists. (Old installs may have leftover config rows; getCurrent
+    uses the latest, and the first toggle/edit reconciles it)
+  - Two dev test buttons (test alarm / countdown) kept under a "Dev tools" label
+  - Built + installed on device; Nick approved the commit (no specific on-device
+    stat-match issues reported)

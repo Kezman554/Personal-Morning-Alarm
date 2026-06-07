@@ -102,6 +102,21 @@
     <string name="status_done">✓</string>
     <string name="status_pending">○</string>
 
+    <!-- Home screen -->
+    <string name="home_tap_to_change">Tap to change</string>
+    <string name="home_alarm_enabled">Alarm enabled</string>
+    <string name="home_alarm_set_for">Alarm set for %1$s</string>
+    <string name="home_alarm_off">Alarm off</string>
+    <string name="home_morning_goal">Morning goal</string>
+    <string name="home_goal_exercise">Exercise</string>
+    <string name="home_goal_project">Project</string>
+    <string name="home_current_streak">Current streak: %1$d days</string>
+    <string name="home_current_streak_one">Current streak: 1 day</string>
+    <string name="home_week_rate">This week: %1$d/%2$d days</string>
+    <string name="home_week_rate_empty">This week: no wake-ups yet</string>
+    <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
+    <string name="home_dev_tools">Dev tools</string>
+
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
     <string name="test_countdown">Test countdown (15s)</string>
