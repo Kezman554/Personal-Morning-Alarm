@@ -73,6 +73,15 @@
     <string name="countdown_channel_description">Shows the Stage 2 time remaining</string>
     <string name="countdown_notification_title">Stage 2 in progress</string>
 
+    <!-- Nuclear alarm (Stage 2 failure) -->
+    <string name="nuclear_channel_name">Nuclear alarm</string>
+    <string name="nuclear_channel_description">Maximum-effort alarm when Stage 2 times out</string>
+    <string name="nuclear_notification_title">WAKE UP NOW</string>
+    <string name="nuclear_notification_text">Time ran out — complete the challenges to stop</string>
+    <string name="nuclear_title">TIME\'S UP</string>
+    <string name="nuclear_subtitle">You didn\'t finish in time.</string>
+    <string name="stop_nuclear_temp">Stop nuclear (temp)</string>
+
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
     <string name="test_countdown">Test countdown (15s)</string>

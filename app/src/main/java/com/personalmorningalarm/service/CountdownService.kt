@@ -125,9 +125,11 @@ class CountdownService : Service() {
 
             override fun onFinish() {
                 _remainingSeconds.value = 0
-                Log.d(TAG, "Stage 2 countdown expired — broadcasting $ACTION_COUNTDOWN_EXPIRED")
+                Log.d(TAG, "Stage 2 countdown expired — triggering nuclear alarm")
+                // Broadcast so the Stage 2 UI can finish itself...
                 sendBroadcast(Intent(ACTION_COUNTDOWN_EXPIRED).setPackage(packageName))
-                // TODO: nuclear alarm receiver will react to the broadcast.
+                // ...and start the nuclear alarm directly (reliable, no receiver hop).
+                NuclearAlarmService.start(this@CountdownService)
                 stopSelf()
             }
         }.start()

@@ -3,7 +3,10 @@ package com.personalmorningalarm.ui
 import android.animation.ArgbEvaluator
 import android.app.KeyguardManager
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
@@ -17,6 +20,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -52,6 +56,15 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private val argbEvaluator = ArgbEvaluator()
     private var vibrator: Vibrator? = null
     private val dismissRunnable = Runnable { dismissToHome() }
+
+    // When Stage 2's countdown expires, CountdownService starts the nuclear alarm
+    // and broadcasts this; finish so we don't linger behind the nuclear screen.
+    private val countdownExpiredReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "Countdown expired — nuclear took over, finishing Stage 2")
+            finish()
+        }
+    }
 
     private var nfcAdapter: NfcAdapter? = null
     private var checkpointManager: NfcCheckpointManager? = null
@@ -92,6 +105,13 @@ class AlarmDismissalActivity : AppCompatActivity() {
         repository = AlarmRepository(AppDatabase.getInstance(this))
         vibrator = resolveVibrator()
         setupNfc()
+
+        ContextCompat.registerReceiver(
+            this,
+            countdownExpiredReceiver,
+            IntentFilter(CountdownService.ACTION_COUNTDOWN_EXPIRED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -144,6 +164,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
         super.onDestroy()
         stretchTimer?.cancel()
         binding.root.removeCallbacks(dismissRunnable)
+        runCatching { unregisterReceiver(countdownExpiredReceiver) }
         isSessionActive = false
     }
 

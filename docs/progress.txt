@@ -318,3 +318,37 @@
     the screen stays readable. Needs a re-confirm next run
   - RE-CONFIRMED on device after grace fix: Nick saw the success screen with the
     streak line ("Day X of your streak!"). Stage 2 success flow complete
+
+2026-06-07  Nuclear alarm infrastructure (Stage 2 failure)
+  - service/NuclearAlarmService: foreground (mediaPlayback), HIGH-importance
+    DND-bypass channel "nuclear_channel". Looping MediaPlayer on the default
+    RINGTONE tone (deliberately DISTINCT from Stage 1, which uses the ALARM tone)
+    via USAGE_ALARM; strong repeating vibration waveform (600/400ms, max amplitude,
+    VibrationAttributes.USAGE_ALARM on API 33 to bypass DND); flashlight strobe via
+    CameraManager.setTorchMode toggled every 250ms. Ongoing full-screen-intent
+    notification -> NuclearDismissalActivity
+  - VOLUME SAFEGUARD: FORCE_MAX_VOLUME const defaults FALSE, so loudness follows the
+    device alarm slider (lets us test without waking the house — Nick's chosen
+    safeguard). Flip to true for production to pin STREAM_ALARM to max. STROBE_ENABLED
+    const (true; strobe is silent so safe during testing)
+  - ui/NuclearDismissalActivity: lock-screen flags (showWhenLocked/turnScreenOn/
+    dismissKeyguard), back swallowed (OnBackPressedCallback + onKeyDown belt-and-
+    suspenders), temp "Stop nuclear" button (gauntlet replaces it next task)
+  - WIRING: CountdownService.onFinish now starts NuclearAlarmService directly (still
+    broadcasts ACTION_COUNTDOWN_EXPIRED too); AlarmDismissalActivity registers a
+    receiver for that broadcast and finish()es so Stage 2 doesn't linger behind the
+    nuclear screen; AlarmReceiver ignores re-fired alarms while NuclearAlarmService
+    .isRunning. Manifest: service (mediaPlayback) + activity (singleTask, nosensor,
+    showOnLockScreen); nuclear strings added
+  - VERIFIED on device (Nick, via Test countdown 15s): nuclear fired on expiry —
+    loud, strobe, vibrate all confirmed. Alarm correctly KEPT RUNNING through back/
+    home (sound is service-driven, can't be silenced by leaving). Notification
+    brought the screen back; temp Stop dismissed
+  - KNOWN LIMITATION (accepted/deferred by Nick): can't make the window itself
+    inescapable without a SYSTEM_ALERT_WINDOW overlay — stock Android can't block
+    HOME, and onUserLeaveHint relaunch is blocked by background-activity-launch
+    rules. Deferred: the real guarantee (alarm never goes silent until dismissed)
+    holds, which is what matters. Revisit overlay only if needed
+  - Back-button hardening (onKeyDown) added this session but NOT yet re-verified on
+    device. OUT OF SCOPE this task (next): the dismissal gauntlet (30s shake + math
+    + NFC + typed phrase) and failure logging / streak reset on nuclear

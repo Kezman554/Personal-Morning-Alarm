@@ -60,8 +60,22 @@
             android:showOnLockScreen="true"
             android:turnScreenOn="true" />
 
+        <activity
+            android:name=".ui.NuclearDismissalActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="nosensor"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true" />
+
         <service
             android:name=".service.AlarmService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".service.NuclearAlarmService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 

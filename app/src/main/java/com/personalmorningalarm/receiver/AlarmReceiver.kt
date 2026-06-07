@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.personalmorningalarm.service.AlarmService
+import com.personalmorningalarm.service.NuclearAlarmService
 import com.personalmorningalarm.ui.AlarmDismissalActivity
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -18,8 +19,8 @@ class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        if (AlarmDismissalActivity.isSessionActive) {
-            Log.d(TAG, "Alarm fired at $now but a dismissal session is already active — ignoring")
+        if (AlarmDismissalActivity.isSessionActive || NuclearAlarmService.isRunning) {
+            Log.d(TAG, "Alarm fired at $now but a wake session/nuclear alarm is active — ignoring")
             return
         }
         Log.d(TAG, "Alarm fired at $now (action=${intent?.action}) — starting AlarmService")
