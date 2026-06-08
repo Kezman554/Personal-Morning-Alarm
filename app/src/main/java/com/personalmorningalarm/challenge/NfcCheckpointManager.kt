@@ -3,13 +3,18 @@ package com.personalmorningalarm.challenge
 import com.personalmorningalarm.data.entity.NfcTag
 
 /**
- * Drives the Stage 2 NFC checkpoint sequence. The tag order is randomised at
- * construction (i.e. fresh each morning) so the user can't go on autopilot.
+ * Drives the Stage 2 NFC checkpoint sequence. A fresh [sequenceLength]-long order
+ * is built at construction (i.e. each morning) so the user can't go on autopilot.
  * Feed each scanned tag's hardware id to [onTagScanned] and act on the result.
+ *
+ * Sequence rules:
+ *  - [sequenceLength] <= number of tags: pick that many unique tags (no repeats).
+ *  - [sequenceLength] > number of tags: tags repeat to reach the length, but never
+ *    the same tag twice in a row (unavoidable only when a single tag is registered).
  */
-class NfcCheckpointManager(tags: List<NfcTag>) {
+class NfcCheckpointManager(tags: List<NfcTag>, sequenceLength: Int) {
 
-    private val ordered: List<NfcTag> = tags.shuffled()
+    private val ordered: List<NfcTag> = buildSequence(tags, sequenceLength)
     private var index = 0
 
     val total: Int = ordered.size
@@ -30,6 +35,27 @@ class NfcCheckpointManager(tags: List<NfcTag>) {
             else CheckpointResult.Correct(currentTag!!)
         } else {
             CheckpointResult.Wrong(expected)
+        }
+    }
+
+    private companion object {
+        fun buildSequence(pool: List<NfcTag>, length: Int): List<NfcTag> {
+            if (pool.isEmpty() || length <= 0) return emptyList()
+            if (length <= pool.size) {
+                // Enough tags for the whole sequence — unique, no repeats.
+                return pool.shuffled().take(length)
+            }
+            // Not enough tags: repeat them, but never the same tag back-to-back.
+            val result = ArrayList<NfcTag>(length)
+            var lastId: String? = null
+            repeat(length) {
+                val candidates = pool.filter { it.tagId != lastId }
+                    .ifEmpty { pool } // only when a single tag is registered
+                val pick = candidates.random()
+                result.add(pick)
+                lastId = pick.tagId
+            }
+            return result
         }
     }
 }

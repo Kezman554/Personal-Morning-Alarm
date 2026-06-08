@@ -23,6 +23,13 @@ data class AlarmConfig(
 
     val morningGoal: MorningGoal = MorningGoal.EXERCISE,
 
+    /**
+     * Number of NFC checkpoints required to clear Stage 2 each morning. If this
+     * exceeds the number of registered tags, tags repeat (never twice in a row);
+     * otherwise N unique tags are picked. Default 5.
+     */
+    val sequenceLength: Int = 5,
+
     /** Epoch millis the config was created. */
     val createdAt: Long = System.currentTimeMillis()
 )

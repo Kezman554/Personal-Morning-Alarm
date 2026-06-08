@@ -26,7 +26,7 @@ import com.personalmorningalarm.data.entity.NfcTag
         ContentToggle::class,
         BundledQuote::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -52,6 +52,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v3: configurable NFC checkpoint count on alarm_config. Non-destructive
+        // so the saved alarm, tags, and quotes survive the upgrade.
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE alarm_config " +
+                        "ADD COLUMN sequenceLength INTEGER NOT NULL DEFAULT 5"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -61,7 +72,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     DB_NAME
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
         }
     }

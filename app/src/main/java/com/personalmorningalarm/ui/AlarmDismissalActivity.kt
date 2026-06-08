@@ -92,6 +92,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
     private var stage2DurationMinutes = DEFAULT_STAGE2_MINUTES
     private var stretchDurationMinutes = DEFAULT_STRETCH_MINUTES
+    private var sequenceLength = DEFAULT_SEQUENCE_LENGTH
     private var morningGoal = MorningGoal.EXERCISE
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -135,6 +136,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repository.getCurrentConfig()?.let { config ->
                 stage2DurationMinutes = config.stage2DurationMinutes
+                sequenceLength = config.sequenceLength
                 morningGoal = config.morningGoal
             }
         }
@@ -245,9 +247,10 @@ class AlarmDismissalActivity : AppCompatActivity() {
                 Log.d(TAG, "Stage 2: no usable NFC tags — falling back to confirm button")
                 setupFallbackConfirm()
             } else {
-                checkpointManager = NfcCheckpointManager(tags)
-                Log.d(TAG, "Stage 2: ${tags.size} checkpoints, tap order randomised; " +
-                    "content=${enabledToggles.map { it.contentType }}, stretch=${stretchDurationMinutes}m")
+                checkpointManager = NfcCheckpointManager(tags, sequenceLength)
+                Log.d(TAG, "Stage 2: ${tags.size} tags, sequence length $sequenceLength, " +
+                    "tap order randomised; content=${enabledToggles.map { it.contentType }}, " +
+                    "stretch=${stretchDurationMinutes}m")
                 enableNfcDispatch()
                 showCheckpoint()
                 promptUnlockIfNeeded()
@@ -516,6 +519,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
             (ShakeChallenge.DEFAULT_TARGET_DURATION_MS / 1000).toInt()
         private const val DEFAULT_STAGE2_MINUTES = 10
         private const val DEFAULT_STRETCH_MINUTES = 5
+        private const val DEFAULT_SEQUENCE_LENGTH = 5
         private const val SUCCESS_DELAY_MS = 1200L
         private const val SUCCESS_SCREEN_MS = 5000L
         private const val TAP_GRACE_MS = 1500L

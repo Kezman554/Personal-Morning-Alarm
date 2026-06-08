@@ -24,6 +24,27 @@
             android:text="@string/manage_nfc_tags" />
 
         <TextView
+            android:id="@+id/nfc_taps_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/nfc_taps_label"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <NumberPicker
+            android:id="@+id/picker_nfc_taps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:id="@+id/nfc_taps_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceBodySmall" />
+
+        <TextView
             android:id="@+id/content_section_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

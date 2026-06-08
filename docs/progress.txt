@@ -403,3 +403,27 @@
   - Two dev test buttons (test alarm / countdown) kept under a "Dev tools" label
   - Built + installed on device; Nick approved the commit (no specific on-device
     stat-match issues reported)
+
+2026-06-08  Configurable NFC checkpoint sequence length
+  - AlarmConfig: new sequenceLength field (default 5) = how many NFC taps Stage 2
+    requires. Non-destructive Room migration v2->v3 (ALTER TABLE alarm_config ADD
+    COLUMN sequenceLength DEFAULT 5); DB version bumped, MIGRATION_2_3 registered
+  - NfcCheckpointManager(tags, sequenceLength): builds the morning's order from the
+    length, not just the pool. length <= #tags -> N unique tags (shuffled, no
+    repeats); length > #tags -> repeats to fill, never the same tag twice in a row
+    (only unavoidable with a single registered tag, which then just repeats). total
+    now reflects the sequence length, so Stage 2's "X of N" updates for free
+  - Settings: new "Number of NFC taps" NumberPicker under the NFC section. Primary
+    range 1..registered-tags; a previously-saved value above the current tag count
+    (e.g. after deleting tags) stays selectable rather than being silently dropped,
+    and the hint warns when taps will repeat. Disabled with a "register a tag" hint
+    when none exist. SettingsViewModel: sequenceLength + activeTagCount StateFlows
+    (combined for the picker) + setSequenceLength (single-row update-in-place)
+  - AlarmDismissalActivity reads config.sequenceLength and passes it to the manager
+  - Unit tests added (app/src/test, first in the project): NfcCheckpointManagerTest
+    covers unique-pick, exact-fit, repeat-with-no-adjacent-dupes (200 randomised
+    iterations), single-tag fallback, empty pool, wrong-tag-no-advance. All pass
+  - VERIFIED: assembleDebug clean; testDebugUnitTest green; installed on SM-A326B;
+    app launched with no Room migration crash (home reads alarm_config on start, so
+    the v3 schema validated against the upgraded v2 DB). On-device end-to-end (set
+    length 3 with 5 tags -> 3 taps; then fewer tags -> repeats) still to be run by Nick
