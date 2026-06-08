@@ -427,3 +427,15 @@
     app launched with no Room migration crash (home reads alarm_config on start, so
     the v3 schema validated against the upgraded v2 DB). On-device end-to-end (set
     length 3 with 5 tags -> 3 taps; then fewer tags -> repeats) still to be run by Nick
+
+2026-06-08  Content-screen fixes (follow-ups from on-device testing)
+  - Picker ceiling bug: the "Number of NFC taps" max was maxOf(tagCount, savedValue),
+    so scrolling DOWN to <= tagCount collapsed the ceiling and you couldn't go back
+    up. Fixed to a fixed ceiling maxOf(tagCount, 10) independent of the current value
+  - Content cycling bug (Nick's catch): with more taps than enabled content types the
+    gaps cycled the types again (a 2nd quote, 2nd stretch). Morning content should be
+    once each per morning. ContentScreenManager.contentForGap now getOrNull(gapIndex)
+    instead of [gapIndex % size] — each enabled type shows once in order, later gaps
+    get nothing
+  - Tests: added ContentScreenManagerTest (once-each-then-null, empty, hasContent).
+    testDebugUnitTest green; reinstalled on SM-A326B
