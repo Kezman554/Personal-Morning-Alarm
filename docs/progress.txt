@@ -439,3 +439,24 @@
     get nothing
   - Tests: added ContentScreenManagerTest (once-each-then-null, empty, hasContent).
     testDebugUnitTest green; reinstalled on SM-A326B
+
+2026-06-09  Daily alarm re-arm fix (alarm fired once then never again)
+  - BUG (Nick hit it for real): alarm went off the morning after he set the time,
+    but not the next day. Root cause: setExactAndAllowWhileIdle is a ONE-SHOT alarm
+    and AlarmReceiver only started AlarmService — nothing re-armed the next day. It
+    appeared to work because saving the time scheduled that one occurrence, and
+    reboots re-arm via BootReceiver; a normal day left no alarm. dumpsys confirmed:
+    last fire 06-08 07:00, no future alarm pending at all
+  - FIX: AlarmReceiver.rescheduleNextDay() — after firing (even when the fire is
+    ignored due to an active session/nuclear), reads the config and, if enabled,
+    schedules the next occurrence (nextTriggerMillis from now+1min so today's just-
+    fired time rolls to tomorrow). Mirrors the proven BootReceiver pattern; starts
+    AlarmService first so the brief FGS-start allowance isn't spent on the DB read
+  - VERIFIED on device (silent: alarm stream forced to min during test): fired a
+    test alarm -> logcat "Alarm fired ... starting AlarmService" + "Re-armed next
+    alarm (alarmTime=420, ok=true)" + dumpsys showed a NEW pending ALARM_FIRED at
+    2026-06-10 07:00:00. Alarm now self-perpetuates daily (BootReceiver still covers
+    reboots). Left enabled + armed for tomorrow 07:00; restored alarm volume
+  - NOTE: force-stopping the app cancels its pending AlarmManager alarms (Android
+    stopped-state) — re-arm needs a fire, a reboot, or re-saving the alarm. Real
+    proof is firing on consecutive mornings (Nick to confirm)
