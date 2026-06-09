@@ -72,6 +72,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private var gapsShown = 0
     private var showingContent = false
     private var stretchTimer: CountDownTimer? = null
+    private var contentDismissTimer: CountDownTimer? = null
     private var showingUnlockHint = false
 
     private val keyguardManager: KeyguardManager by lazy {
@@ -165,6 +166,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stretchTimer?.cancel()
+        contentDismissTimer?.cancel()
         binding.root.removeCallbacks(dismissRunnable)
         runCatching { unregisterReceiver(countdownExpiredReceiver) }
         isSessionActive = false
@@ -310,6 +312,13 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.contentAuthor.visibility = View.GONE
         binding.contentTimer.visibility = View.GONE
         stretchTimer?.cancel()
+        // Reset the Continue control: enabled by default (the quote screen locks it).
+        contentDismissTimer?.cancel()
+        binding.tvContinueCountdown.visibility = View.GONE
+        binding.btnContinue.animate().cancel()
+        binding.btnContinue.scaleX = 1f
+        binding.btnContinue.scaleY = 1f
+        setContinueEnabled(true)
         binding.btnContinue.setOnClickListener { onContentContinue() }
 
         when (type) {
@@ -331,6 +340,41 @@ class AlarmDismissalActivity : AppCompatActivity() {
                 binding.contentAuthor.text = getString(R.string.quote_author_format, author)
             }
         }
+        startContentDismissLock() // make the user sit with the quote before continuing
+    }
+
+    /**
+     * Locks the Continue button for [CONTENT_DISMISS_LOCK_MS], counting down next to
+     * it, then re-enables it with a pop. Generic so other content screens can reuse
+     * it; the stretch screen has its own timer and doesn't call this.
+     */
+    private fun startContentDismissLock() {
+        setContinueEnabled(false)
+        binding.tvContinueCountdown.visibility = View.VISIBLE
+        contentDismissTimer = object : CountDownTimer(CONTENT_DISMISS_LOCK_MS, 1000L) {
+            override fun onTick(msLeft: Long) {
+                val secs = ceil(msLeft / 1000.0).toInt()
+                binding.tvContinueCountdown.text = getString(R.string.content_dismiss_seconds, secs)
+            }
+
+            override fun onFinish() {
+                binding.tvContinueCountdown.visibility = View.GONE
+                setContinueEnabled(true)
+                // Visual cue that it's now tappable: a brief scale pop.
+                binding.btnContinue.animate()
+                    .scaleX(1.1f).scaleY(1.1f).setDuration(150L)
+                    .withEndAction {
+                        binding.btnContinue.animate().scaleX(1f).scaleY(1f).setDuration(150L).start()
+                    }
+                    .start()
+            }
+        }.start()
+    }
+
+    /** Enables/disables Continue and greys it out while disabled. */
+    private fun setContinueEnabled(enabled: Boolean) {
+        binding.btnContinue.isEnabled = enabled
+        binding.btnContinue.alpha = if (enabled) 1f else 0.4f
     }
 
     private fun showStretchContent() {
@@ -357,6 +401,8 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private fun onContentContinue() {
         stretchTimer?.cancel()
         stretchTimer = null
+        contentDismissTimer?.cancel()
+        contentDismissTimer = null
         showingContent = false
         binding.contentPanel.visibility = View.GONE
         binding.content.visibility = View.VISIBLE
@@ -520,6 +566,10 @@ class AlarmDismissalActivity : AppCompatActivity() {
         private const val DEFAULT_STAGE2_MINUTES = 10
         private const val DEFAULT_STRETCH_MINUTES = 5
         private const val DEFAULT_SEQUENCE_LENGTH = 5
+
+        /** How long a content screen locks its Continue button (quote, and future
+         *  fixed-duration screens). Stretch is excluded — it uses its own duration. */
+        private const val CONTENT_DISMISS_LOCK_MS = 15_000L
         private const val SUCCESS_DELAY_MS = 1200L
         private const val SUCCESS_SCREEN_MS = 5000L
         private const val TAP_GRACE_MS = 1500L

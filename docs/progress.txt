@@ -460,3 +460,18 @@
   - NOTE: force-stopping the app cancels its pending AlarmManager alarms (Android
     stopped-state) — re-arm needs a fire, a reboot, or re-saving the alarm. Real
     proof is firing on consecutive mornings (Nick to confirm)
+
+2026-06-09  Quote screen 15s dismiss lock
+  - Quote content screen now locks its Continue button for 15s: button disabled +
+    greyed (alpha 0.4), a "15s..1s" countdown shows just above it (new
+    tv_continue_countdown), and on finish Continue re-enables with a brief scale-pop
+    cue. Makes the user actually sit with the quote
+  - Duration is a constant CONTENT_DISMISS_LOCK_MS (15_000) so future fixed-duration
+    content screens can reuse startContentDismissLock(); setContinueEnabled(enabled)
+    handles the grey-out. showContentScreen resets the button to enabled + cancels
+    any prior lock/animation each time, so only the quote screen locks
+  - Stretch screen unchanged — it keeps its own configurable duration + auto-advance
+    and never calls the lock. contentDismissTimer cancelled in onContentContinue and
+    onDestroy alongside stretchTimer
+  - Built + installed on SM-A326B. On-device check (shake -> Stage 2 -> quote gap ->
+    Continue disabled 15s then enables) needs a physical run — Nick to confirm

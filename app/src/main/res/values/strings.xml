@@ -55,6 +55,7 @@
 
     <!-- Content screens -->
     <string name="content_continue">Continue</string>
+    <string name="content_dismiss_seconds">%1$ds</string>
     <string name="content_quote_heading">Take a moment</string>
     <string name="content_stretch_heading">Stretch it out</string>
     <string name="content_goal_heading">Today\'s goal</string>
