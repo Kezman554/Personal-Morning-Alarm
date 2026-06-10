@@ -502,3 +502,33 @@
     streak 1/1; bars "— / — / 0/1 / 4/5" (4 Jun filled ~80%); heatmap greens for
     04/06/08/10 Jun, red for 07 (nuclear) + 03 Jun, grey gaps; history list dates/
     goals/durations/glyphs all correct. testDebugUnitTest green; no regressions
+
+2026-06-10  Alarm PIN (guards alarm time, on/off, Stage 2 limit)
+  - Optional 4-digit PIN so you can't change wake-up settings half-asleep. util/
+    PinManager: SharedPreferences ("pma_security"), stores SHA-256(per-install random
+    salt + pin) — never the raw digits. isPinSet/setPin/verify(constant-time)/clearPin.
+    A 4-digit PIN is low-entropy by nature; this is a nuisance guard, not real security
+  - ui/PinDialog: custom keypad dialog (dialog_pin.xml) — own on-screen 0-9 pad (system
+    IME never shown), filled/empty dots (pin_dot_filled/empty drawables), Cancel +
+    backspace. Doesn't decide meaning: on the 4th digit it calls onComplete(pin, dialog)
+    so the caller can verify / advance / showError / dismiss. PinKey button style added
+  - ui/PinPrompts: the four flows over that one keypad — guard (run action now if no
+    PIN, else prompt+verify), setup (enter twice to confirm), change (verify current ->
+    setup), disable (verify current -> clear)
+  - GATED (req 4): HomeFragment alarm-time tap + enable/disable switch; SettingsFragment
+    Stage 2 time-limit row. Switch flips visually on tap, so when gated it's reverted
+    immediately and only re-applied on a correct PIN (wrong/cancel leaves it untouched)
+  - NOT gated (req 5): content toggles, stretch duration, NFC tag registration, NFC tap
+    count. (Sound/theme/quote mgmt don't exist as controls yet)
+  - Settings "Alarm PIN" section: status + Set (no PIN) / Change + Disable (PIN set),
+    visibility via renderPinSection()
+  - NEW Stage 2 control: req 4 named "Stage 2 timer duration" but no UI existed (only
+    AlarmConfig.stage2DurationMinutes). Added a tappable "Stage 2 time limit" row ->
+    NumberPicker dialog (5-15 min, PRD range) + SettingsViewModel.stage2Duration flow /
+    setStage2Duration. Gated behind the PIN
+  - VERIFIED on device (SM-A326B, adb/uiautomator-driven): set PIN 1234 (two-step
+    confirm) -> "PIN is on"; alarm-time tap prompted; wrong 9999 -> "Wrong PIN - try
+    again" (dots reset, picker stayed shut); correct 1234 -> TimePicker opened; enable
+    switch + Stage 2 row both prompted (switch unchanged after cancel); Stage 2 picker
+    opened on correct PIN; disable 1234 -> "No PIN set", controls open freely again.
+    Build + testDebugUnitTest green; device left in clean no-PIN state

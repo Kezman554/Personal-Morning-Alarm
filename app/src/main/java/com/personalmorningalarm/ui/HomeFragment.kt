@@ -20,6 +20,7 @@ import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.databinding.FragmentHomeBinding
 import com.personalmorningalarm.service.CountdownService
 import com.personalmorningalarm.util.AlarmScheduler
+import com.personalmorningalarm.util.PinManager
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -35,6 +36,7 @@ class HomeFragment : Fragment() {
     }
 
     private lateinit var scheduler: AlarmScheduler
+    private lateinit var pinManager: PinManager
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -48,12 +50,15 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         scheduler = AlarmScheduler(requireContext())
+        pinManager = PinManager(requireContext())
 
-        binding.tvAlarmTime.setOnClickListener { showTimePicker() }
+        binding.tvAlarmTime.setOnClickListener {
+            PinPrompts.guard(requireContext(), pinManager) { showTimePicker() }
+        }
 
         // setOnClickListener fires only on user taps (after the checked state
         // flips), so programmatic state updates below don't loop back.
-        binding.switchEnabled.setOnClickListener { onToggleEnabled(binding.switchEnabled.isChecked) }
+        binding.switchEnabled.setOnClickListener { onToggleEnabledTapped() }
         binding.rbExercise.setOnClickListener { viewModel.setMorningGoal(MorningGoal.EXERCISE) }
         binding.rbProject.setOnClickListener { viewModel.setMorningGoal(MorningGoal.PROJECT) }
 
@@ -114,6 +119,20 @@ class HomeFragment : Fragment() {
             minutes % 60,
             DateFormat.is24HourFormat(requireContext())
         ).show()
+    }
+
+    /**
+     * The switch flips visually on tap. When a PIN guards it, revert that flip
+     * until the PIN is confirmed, then re-apply on success; a wrong/cancelled PIN
+     * leaves the switch in its original state.
+     */
+    private fun onToggleEnabledTapped() {
+        val desired = binding.switchEnabled.isChecked
+        if (pinManager.isPinSet()) binding.switchEnabled.isChecked = !desired
+        PinPrompts.guard(requireContext(), pinManager) {
+            binding.switchEnabled.isChecked = desired
+            onToggleEnabled(desired)
+        }
     }
 
     private fun onToggleEnabled(enabled: Boolean) {

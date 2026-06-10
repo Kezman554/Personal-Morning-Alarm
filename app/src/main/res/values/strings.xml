@@ -122,6 +122,32 @@
     <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
     <string name="home_dev_tools">Dev tools</string>
 
+    <!-- Alarm PIN -->
+    <string name="pin_section_title">Alarm PIN</string>
+    <string name="pin_section_explainer">Protects the alarm time, on/off switch, and Stage 2 time limit so you can\'t change them half-asleep.</string>
+    <string name="pin_status_off">No PIN set</string>
+    <string name="pin_status_on">PIN is on</string>
+    <string name="pin_set">Set Alarm PIN</string>
+    <string name="pin_change">Change PIN</string>
+    <string name="pin_disable">Disable PIN</string>
+    <string name="pin_backspace">⌫</string>
+    <string name="pin_backspace_desc">Delete last digit</string>
+    <string name="pin_enter_title">Enter PIN</string>
+    <string name="pin_enter_message">Enter your PIN to make this change.</string>
+    <string name="pin_set_title">Choose a 4-digit PIN</string>
+    <string name="pin_confirm_title">Re-enter to confirm</string>
+    <string name="pin_current_title">Enter current PIN</string>
+    <string name="pin_wrong">Wrong PIN — try again</string>
+    <string name="pin_mismatch">PINs didn\'t match — start again</string>
+    <string name="pin_set_done">PIN set</string>
+    <string name="pin_changed">PIN changed</string>
+    <string name="pin_disabled">PIN disabled</string>
+
+    <!-- Stage 2 time limit -->
+    <string name="stage2_duration_label">Stage 2 time limit</string>
+    <string name="stage2_duration_value">%1$d min</string>
+    <string name="stage2_duration_dialog_title">Stage 2 time limit (minutes)</string>
+
     <!-- Statistics screen -->
     <string name="stats_current_streak">Current streak</string>
     <string name="stats_longest_streak">Longest streak</string>

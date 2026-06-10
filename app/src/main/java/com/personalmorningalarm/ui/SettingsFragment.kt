@@ -1,9 +1,12 @@
 package com.personalmorningalarm.ui
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.NumberPicker
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -15,6 +18,7 @@ import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.model.ContentType
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
+import com.personalmorningalarm.util.PinManager
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -26,6 +30,11 @@ class SettingsFragment : Fragment() {
     private val viewModel: SettingsViewModel by viewModels {
         ViewModelFactory(AlarmRepository(AppDatabase.getInstance(requireContext())))
     }
+
+    private lateinit var pinManager: PinManager
+
+    /** Cached so the Stage 2 picker dialog opens on the current saved value. */
+    private var stage2Duration: Int = DEFAULT_STAGE2_DURATION
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,9 +48,39 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        pinManager = PinManager(requireContext())
+
         binding.btnManageTags.setOnClickListener {
             findNavController().navigate(R.id.action_settings_to_nfcTags)
         }
+
+        // Stage 2 time limit — PIN-protected before the picker opens.
+        binding.rowStage2Duration.setOnClickListener {
+            PinPrompts.guard(requireContext(), pinManager) { showStage2DurationDialog() }
+        }
+
+        binding.btnSetPin.setOnClickListener {
+            PinPrompts.setup(requireContext(), pinManager) { ok ->
+                if (ok) {
+                    toast(getString(R.string.pin_set_done))
+                    renderPinSection()
+                }
+            }
+        }
+        binding.btnChangePin.setOnClickListener {
+            PinPrompts.change(requireContext(), pinManager) { ok ->
+                if (ok) toast(getString(R.string.pin_changed))
+            }
+        }
+        binding.btnDisablePin.setOnClickListener {
+            PinPrompts.disable(requireContext(), pinManager) { ok ->
+                if (ok) {
+                    toast(getString(R.string.pin_disabled))
+                    renderPinSection()
+                }
+            }
+        }
+        renderPinSection()
 
         binding.pickerNfcTaps.minValue = 1
         // setValue (used when rendering) doesn't fire this, so no feedback loop.
@@ -73,6 +112,16 @@ class SettingsFragment : Fragment() {
                     viewModel.activeTagCount
                 ) { length, tagCount -> length to tagCount }
                     .collect { (length, tagCount) -> renderTapPicker(length, tagCount) }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.stage2Duration.collect { minutes ->
+                    stage2Duration = minutes
+                    binding.tvStage2DurationValue.text =
+                        getString(R.string.stage2_duration_value, minutes)
+                }
             }
         }
 
@@ -127,9 +176,44 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    /** Shows the Set / Change+Disable buttons depending on whether a PIN exists. */
+    private fun renderPinSection() {
+        val pinSet = pinManager.isPinSet()
+        binding.tvPinStatus.text =
+            getString(if (pinSet) R.string.pin_status_on else R.string.pin_status_off)
+        binding.btnSetPin.visibility = if (pinSet) View.GONE else View.VISIBLE
+        binding.btnChangePin.visibility = if (pinSet) View.VISIBLE else View.GONE
+        binding.btnDisablePin.visibility = if (pinSet) View.VISIBLE else View.GONE
+    }
+
+    /** Number-picker dialog (5–15 min) for the Stage 2 time limit. */
+    private fun showStage2DurationDialog() {
+        val picker = NumberPicker(requireContext()).apply {
+            minValue = MIN_STAGE2_DURATION
+            maxValue = MAX_STAGE2_DURATION
+            value = stage2Duration.coerceIn(MIN_STAGE2_DURATION, MAX_STAGE2_DURATION)
+            wrapSelectorWheel = false
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.stage2_duration_dialog_title)
+            .setView(picker)
+            .setPositiveButton(R.string.save) { _, _ -> viewModel.setStage2Duration(picker.value) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+    }
+
     private companion object {
         /** Picker ceiling (also allows more if the user registers more tags). */
         const val MAX_SEQUENCE_LENGTH = 10
+
+        /** Stage 2 time-limit bounds, per the PRD (5–15 min). */
+        const val MIN_STAGE2_DURATION = 5
+        const val MAX_STAGE2_DURATION = 15
+        const val DEFAULT_STAGE2_DURATION = 10
     }
 
     override fun onDestroyView() {

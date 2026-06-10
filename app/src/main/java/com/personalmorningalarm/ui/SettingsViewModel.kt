@@ -27,6 +27,11 @@ class SettingsViewModel(private val repository: AlarmRepository) : ViewModel() {
     val activeTagCount: StateFlow<Int> = repository.observeActiveTagCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** Stage 2 countdown length in minutes (the saved config value). */
+    val stage2Duration: StateFlow<Int> = repository.observeCurrentConfig()
+        .map { it?.stage2DurationMinutes ?: DEFAULT_STAGE2_DURATION }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DEFAULT_STAGE2_DURATION)
+
     fun setSequenceLength(length: Int) {
         viewModelScope.launch {
             val current = repository.getCurrentConfig()
@@ -40,6 +45,23 @@ class SettingsViewModel(private val repository: AlarmRepository) : ViewModel() {
                 )
             } else {
                 repository.updateConfig(current.copy(sequenceLength = length))
+            }
+        }
+    }
+
+    fun setStage2Duration(minutes: Int) {
+        viewModelScope.launch {
+            val current = repository.getCurrentConfig()
+            if (current == null) {
+                repository.saveConfig(
+                    AlarmConfig(
+                        alarmTime = HomeViewModel.DEFAULT_ALARM_MINUTES,
+                        isEnabled = false,
+                        stage2DurationMinutes = minutes
+                    )
+                )
+            } else {
+                repository.updateConfig(current.copy(stage2DurationMinutes = minutes))
             }
         }
     }
@@ -62,5 +84,6 @@ class SettingsViewModel(private val repository: AlarmRepository) : ViewModel() {
 
     companion object {
         private const val DEFAULT_SEQUENCE_LENGTH = 5
+        private const val DEFAULT_STAGE2_DURATION = 10
     }
 }
