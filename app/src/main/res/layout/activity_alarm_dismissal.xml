@@ -113,6 +113,18 @@
             android:textColor="@android:color/white"
             tools:text="Take a moment" />
 
+        <!-- Stretch "X of N" progress (stretch screen only) -->
+        <TextView
+            android:id="@+id/tv_stretch_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="@android:color/white"
+            android:visibility="gone"
+            tools:text="Stretch 2 of 5"
+            tools:visibility="visible" />
+
         <TextView
             android:id="@+id/content_body"
             android:layout_width="match_parent"

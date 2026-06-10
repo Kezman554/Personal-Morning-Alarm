@@ -12,11 +12,15 @@ import com.personalmorningalarm.data.dao.AlarmEventDao
 import com.personalmorningalarm.data.dao.BundledQuoteDao
 import com.personalmorningalarm.data.dao.ContentToggleDao
 import com.personalmorningalarm.data.dao.NfcTagDao
+import com.personalmorningalarm.data.dao.StretchExerciseDao
+import com.personalmorningalarm.data.dao.StretchRoutineDao
 import com.personalmorningalarm.data.entity.AlarmConfig
 import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.BundledQuote
 import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
+import com.personalmorningalarm.data.entity.StretchExercise
+import com.personalmorningalarm.data.entity.StretchRoutine
 
 @Database(
     entities = [
@@ -24,10 +28,12 @@ import com.personalmorningalarm.data.entity.NfcTag
         AlarmEvent::class,
         NfcTag::class,
         ContentToggle::class,
-        BundledQuote::class
+        BundledQuote::class,
+        StretchRoutine::class,
+        StretchExercise::class
     ],
-    version = 3,
-    exportSchema = false
+    version = 4,
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +43,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun nfcTagDao(): NfcTagDao
     abstract fun contentToggleDao(): ContentToggleDao
     abstract fun bundledQuoteDao(): BundledQuoteDao
+    abstract fun stretchRoutineDao(): StretchRoutineDao
+    abstract fun stretchExerciseDao(): StretchExerciseDao
 
     companion object {
         private const val DB_NAME = "personal_morning_alarm.db"
@@ -63,6 +71,34 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v4: stretch routines/exercises + per-goal routine mapping on alarm_config.
+        // Non-destructive. CREATE statements are copied verbatim from the exported
+        // Room schema (app/schemas/.../4.json) so they match what Room validates.
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `stretch_routines` " +
+                        "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                        "`isActive` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `stretch_exercises` " +
+                        "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `routineId` INTEGER NOT NULL, " +
+                        "`name` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, " +
+                        "`instructions` TEXT NOT NULL, `displayOrder` INTEGER NOT NULL, " +
+                        "FOREIGN KEY(`routineId`) REFERENCES `stretch_routines`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE )"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_stretch_exercises_routineId` " +
+                        "ON `stretch_exercises` (`routineId`)"
+                )
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN matchRoutineToGoal INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN exerciseRoutineId INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN projectRoutineId INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -72,7 +108,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     DB_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .build().also { INSTANCE = it }
             }
         }
     }

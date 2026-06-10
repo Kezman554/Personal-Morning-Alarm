@@ -562,3 +562,44 @@
     Pool now 41 = 40 original bundled + 1 custom. Build + testDebugUnitTest green
   - NOT exercised live: the last-quote guard (would need deleting 40 quotes); enforced in
     code (VM count<=1 + fragment size<=1)
+
+2026-06-10  Stretch routine system (entities, management UI, Stage 2 integration)
+  - DATA: two new entities — StretchRoutine (id, name, isActive, createdAt) and
+    StretchExercise (id, routineId FK CASCADE, name, durationSeconds, instructions,
+    displayOrder) + DAOs + repository methods. RoutineWithCount projection (routine +
+    exercise count) for the list. AlarmConfig gained matchRoutineToGoal +
+    exerciseRoutineId + projectRoutineId (per-goal mapping)
+  - MIGRATION v3->v4: creates both tables (+ FK index) and adds the 3 alarm_config
+    columns. To avoid hand-writing schema Room would reject, enabled exportSchema=true
+    (ksp room.schemaLocation -> app/schemas) and copied the CREATE statements verbatim
+    from 4.json. Non-destructive; the existing v3 DB upgraded cleanly on device
+  - SEED (first launch, idempotent): 3 presets — Pre-Run Warmup (dynamic), General
+    Morning Stretch (static, seeded active), Rest Day Mobility (gentle), 5 exercises each
+  - UI: Settings -> "Manage stretch routines" -> StretchRoutinesFragment (list with
+    active radios + "match to morning goal" switch + per-goal routine pickers + add FAB)
+    -> tap a routine -> RoutineEditFragment (rename, add/edit stretch via 3-field dialog,
+    delete stretch w/ confirm, reorder via up/down buttons, delete routine). Last-routine
+    guard. routineId passed via nav argument
+  - REQ 8 (active routine): manual via StretchRoutine.isActive (single active, set by the
+    radio), OR matched to the morning goal (config flag + per-goal ids). repository.
+    getStretchRoutineForGoal(goal) resolves: goal-mapped routine if matching is on, else
+    the active one, else the first (so the screen always has content)
+  - REQ 9 (Stage 2): AlarmDismissalActivity stretch screen now loads the active routine's
+    exercises and steps through them one at a time — heading=name, body=instructions,
+    new tv_stretch_progress="Stretch X of N", per-exercise countdown; auto-advances on
+    each timer's finish, ends the block after the last (Continue still skips). Falls back
+    to the old suggestions string if a routine has no exercises
+  - VERIFIED on device (SM-A326B, adb/uiautomator-driven): migration ran with no crash;
+    "Seeded 3 stretch routines"; list shows all 3 (General active). Tested: set active ->
+    Pre-Run (DB isActive moved); reorder (move Shoulder up -> DB displayOrder swapped,
+    confirmed visually); add stretch "Calf raises" (->6) then delete it w/ confirm (->5);
+    created custom "Evening Wind-down" routine + renamed + added a stretch; enabled
+    match-to-goal and mapped Exercise->Pre-Run, Project->General (config row updated).
+    Stage 2 resolution verified by replicating getStretchRoutineForGoal against the DB:
+    goal=PROJECT -> "General Morning Stretch" -> its 5 per-stretch screens w/ durations.
+    Build + testDebugUnitTest green
+  - Left configured for Nick: match-to-goal ON (Exercise->Pre-Run, Project->General, the
+    PRD example), custom "Evening Wind-down" routine present, General reordered (Shoulder
+    first from the reorder test). Live shake-through display of the stretch screen still
+    for Nick to confirm. NOTE: pre-existing cruft — alarm_config has ~46 accumulated rows
+    from earlier dev; getCurrent() uses the latest, so behaviour is correct

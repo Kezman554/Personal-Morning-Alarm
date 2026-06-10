@@ -30,6 +30,19 @@ data class AlarmConfig(
      */
     val sequenceLength: Int = 5,
 
+    /**
+     * When true, the Stage 2 stretch routine is chosen from the morning goal
+     * ([exerciseRoutineId] / [projectRoutineId]); when false, the manually
+     * marked-active routine (StretchRoutine.isActive) is used.
+     */
+    val matchRoutineToGoal: Boolean = false,
+
+    /** Routine used when [matchRoutineToGoal] and goal is EXERCISE (0 = unset). */
+    val exerciseRoutineId: Long = 0,
+
+    /** Routine used when [matchRoutineToGoal] and goal is PROJECT (0 = unset). */
+    val projectRoutineId: Long = 0,
+
     /** Epoch millis the config was created. */
     val createdAt: Long = System.currentTimeMillis()
 )

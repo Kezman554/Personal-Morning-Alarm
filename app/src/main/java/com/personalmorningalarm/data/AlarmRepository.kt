@@ -1,11 +1,15 @@
 package com.personalmorningalarm.data
 
+import com.personalmorningalarm.data.dao.RoutineWithCount
 import com.personalmorningalarm.data.entity.AlarmConfig
 import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.BundledQuote
 import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
+import com.personalmorningalarm.data.entity.StretchExercise
+import com.personalmorningalarm.data.entity.StretchRoutine
 import com.personalmorningalarm.data.model.ContentType
+import com.personalmorningalarm.data.model.MorningGoal
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -20,6 +24,8 @@ class AlarmRepository(private val db: AppDatabase) {
     private val nfcTagDao = db.nfcTagDao()
     private val contentToggleDao = db.contentToggleDao()
     private val bundledQuoteDao = db.bundledQuoteDao()
+    private val stretchRoutineDao = db.stretchRoutineDao()
+    private val stretchExerciseDao = db.stretchExerciseDao()
 
     // --- Alarm config ---
     suspend fun getCurrentConfig(): AlarmConfig? = alarmConfigDao.getCurrent()
@@ -67,6 +73,53 @@ class AlarmRepository(private val db: AppDatabase) {
     fun observeQuotes(): Flow<List<BundledQuote>> = bundledQuoteDao.observeAll()
     suspend fun getRandomQuote(): BundledQuote? = bundledQuoteDao.getRandom()
     suspend fun getQuoteCount(): Int = bundledQuoteDao.count()
+
+    // --- Stretch routines & exercises ---
+    suspend fun addRoutine(routine: StretchRoutine): Long = stretchRoutineDao.insert(routine)
+    suspend fun updateRoutine(routine: StretchRoutine) = stretchRoutineDao.update(routine)
+    suspend fun deleteRoutine(routine: StretchRoutine) = stretchRoutineDao.delete(routine)
+    suspend fun getRoutine(id: Long): StretchRoutine? = stretchRoutineDao.getById(id)
+    suspend fun getAllRoutines(): List<StretchRoutine> = stretchRoutineDao.getAll()
+    fun observeRoutines(): Flow<List<StretchRoutine>> = stretchRoutineDao.observeAll()
+    fun observeRoutinesWithCounts(): Flow<List<RoutineWithCount>> =
+        stretchRoutineDao.observeAllWithCounts()
+    suspend fun getRoutineCount(): Int = stretchRoutineDao.count()
+
+    suspend fun addExercise(exercise: StretchExercise): Long = stretchExerciseDao.insert(exercise)
+    suspend fun addExercises(exercises: List<StretchExercise>) =
+        stretchExerciseDao.insertAll(exercises)
+    suspend fun updateExercise(exercise: StretchExercise) = stretchExerciseDao.update(exercise)
+    suspend fun updateExercises(exercises: List<StretchExercise>) =
+        stretchExerciseDao.updateAll(exercises)
+    suspend fun deleteExercise(exercise: StretchExercise) = stretchExerciseDao.delete(exercise)
+    suspend fun getExercisesForRoutine(routineId: Long): List<StretchExercise> =
+        stretchExerciseDao.getForRoutine(routineId)
+    fun observeExercisesForRoutine(routineId: Long): Flow<List<StretchExercise>> =
+        stretchExerciseDao.observeForRoutine(routineId)
+
+    /** Marks [id] the active routine, clearing the flag on all others first. */
+    suspend fun setActiveRoutine(id: Long) {
+        stretchRoutineDao.clearActive()
+        stretchRoutineDao.markActive(id)
+    }
+
+    /**
+     * The routine to use for Stage 2's stretch screen, given the morning [goal].
+     * If the config matches routines to goals, uses the goal's mapped routine;
+     * otherwise the manually marked-active routine. Falls back to the first
+     * routine so the stretch screen always has something to show.
+     */
+    suspend fun getStretchRoutineForGoal(goal: MorningGoal): StretchRoutine? {
+        val config = alarmConfigDao.getCurrent()
+        if (config?.matchRoutineToGoal == true) {
+            val mappedId = when (goal) {
+                MorningGoal.EXERCISE -> config.exerciseRoutineId
+                MorningGoal.PROJECT -> config.projectRoutineId
+            }
+            stretchRoutineDao.getById(mappedId)?.let { return it }
+        }
+        return stretchRoutineDao.getActive() ?: stretchRoutineDao.getAll().firstOrNull()
+    }
 
     // --- Stats ---
 

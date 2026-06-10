@@ -32,6 +32,7 @@ import com.personalmorningalarm.challenge.ShakeChallenge
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.entity.AlarmEvent
+import com.personalmorningalarm.data.entity.StretchExercise
 import com.personalmorningalarm.data.model.ContentType
 import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.databinding.ActivityAlarmDismissalBinding
@@ -95,6 +96,10 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private var stretchDurationMinutes = DEFAULT_STRETCH_MINUTES
     private var sequenceLength = DEFAULT_SEQUENCE_LENGTH
     private var morningGoal = MorningGoal.EXERCISE
+
+    // Active stretch routine's exercises, stepped through on the stretch screen.
+    private var stretchExercises: List<StretchExercise> = emptyList()
+    private var stretchIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -311,6 +316,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.contentPanel.visibility = View.VISIBLE
         binding.contentAuthor.visibility = View.GONE
         binding.contentTimer.visibility = View.GONE
+        binding.tvStretchProgress.visibility = View.GONE
         stretchTimer?.cancel()
         // Reset the Continue control: enabled by default (the quote screen locks it).
         contentDismissTimer?.cancel()
@@ -378,6 +384,50 @@ class AlarmDismissalActivity : AppCompatActivity() {
     }
 
     private fun showStretchContent() {
+        binding.contentHeading.text = getString(R.string.content_stretch_heading)
+        binding.contentTimer.visibility = View.VISIBLE
+        // Load the active routine for this morning, then step through its exercises.
+        lifecycleScope.launch {
+            val routine = repository.getStretchRoutineForGoal(morningGoal)
+            stretchExercises = routine?.let { repository.getExercisesForRoutine(it.id) } ?: emptyList()
+            stretchIndex = 0
+            if (stretchExercises.isEmpty()) {
+                Log.d(TAG, "Stretch: no routine/exercises — falling back to suggestions")
+                showStretchFallback()
+            } else {
+                Log.d(TAG, "Stretch routine '${routine?.name}', ${stretchExercises.size} exercises")
+                showCurrentStretch()
+            }
+        }
+    }
+
+    /** Shows the current stretch (name, instructions, per-stretch countdown). */
+    private fun showCurrentStretch() {
+        val exercise = stretchExercises[stretchIndex]
+        binding.contentHeading.text = exercise.name
+        binding.tvStretchProgress.visibility = View.VISIBLE
+        binding.tvStretchProgress.text =
+            getString(R.string.stretch_progress, stretchIndex + 1, stretchExercises.size)
+        binding.contentBody.text = exercise.instructions
+        binding.contentTimer.visibility = View.VISIBLE
+        stretchTimer?.cancel()
+        stretchTimer = object : CountDownTimer(exercise.durationSeconds * 1000L, 1000L) {
+            override fun onTick(msLeft: Long) {
+                binding.contentTimer.text = CountdownService.formatTime((msLeft / 1000L).toInt())
+            }
+            override fun onFinish() = advanceStretch()
+        }.start()
+    }
+
+    /** Moves to the next stretch, or ends the stretch screen after the last one. */
+    private fun advanceStretch() {
+        stretchIndex++
+        if (stretchIndex < stretchExercises.size) showCurrentStretch()
+        else onContentContinue()
+    }
+
+    /** Fallback when no routine is configured: the old single-timer suggestion list. */
+    private fun showStretchFallback() {
         binding.contentHeading.text = getString(R.string.content_stretch_heading)
         binding.contentBody.text = getString(R.string.stretch_suggestions)
         binding.contentTimer.visibility = View.VISIBLE

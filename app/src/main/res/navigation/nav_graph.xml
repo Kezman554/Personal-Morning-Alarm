@@ -28,6 +28,9 @@
         <action
             android:id="@+id/action_settings_to_quotes"
             app:destination="@id/quoteManagementFragment" />
+        <action
+            android:id="@+id/action_settings_to_routines"
+            app:destination="@id/stretchRoutinesFragment" />
     </fragment>
 
     <fragment
@@ -41,5 +44,25 @@
         android:name="com.personalmorningalarm.ui.QuoteManagementFragment"
         android:label="@string/quote_management_title"
         tools:layout="@layout/fragment_quote_management" />
+
+    <fragment
+        android:id="@+id/stretchRoutinesFragment"
+        android:name="com.personalmorningalarm.ui.StretchRoutinesFragment"
+        android:label="@string/routines_title"
+        tools:layout="@layout/fragment_stretch_routines">
+        <action
+            android:id="@+id/action_routines_to_edit"
+            app:destination="@id/routineEditFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/routineEditFragment"
+        android:name="com.personalmorningalarm.ui.RoutineEditFragment"
+        android:label="@string/routine_edit_title"
+        tools:layout="@layout/fragment_routine_edit">
+        <argument
+            android:name="routineId"
+            app:argType="long" />
+    </fragment>
 
 </navigation>

@@ -58,6 +58,10 @@ class SettingsFragment : Fragment() {
             findNavController().navigate(R.id.action_settings_to_quotes)
         }
 
+        binding.btnManageRoutines.setOnClickListener {
+            findNavController().navigate(R.id.action_settings_to_routines)
+        }
+
         // Stage 2 time limit — PIN-protected before the picker opens.
         binding.rowStage2Duration.setOnClickListener {
             PinPrompts.guard(requireContext(), pinManager) { showStage2DurationDialog() }

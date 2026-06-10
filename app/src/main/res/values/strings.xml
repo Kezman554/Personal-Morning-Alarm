@@ -122,6 +122,42 @@
     <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
     <string name="home_dev_tools">Dev tools</string>
 
+    <!-- Stretch routines -->
+    <string name="manage_routines">Manage stretch routines</string>
+    <string name="routines_title">Stretch routines</string>
+    <string name="routine_edit_title">Edit routine</string>
+    <string name="routine_match_goal">Match routine to morning goal</string>
+    <string name="routine_for_exercise">Exercise</string>
+    <string name="routine_for_project">Project</string>
+    <string name="routine_none_selected">Not set — tap to choose</string>
+    <string name="routine_active">Active</string>
+    <string name="routine_stretch_count">%1$d stretches</string>
+    <string name="routine_stretch_count_one">1 stretch</string>
+    <string name="routine_add">Add routine</string>
+    <string name="routine_new_name">New routine</string>
+    <string name="routine_rename">Rename</string>
+    <string name="routine_rename_title">Rename routine</string>
+    <string name="routine_name_hint">Routine name</string>
+    <string name="routine_delete">Delete routine</string>
+    <string name="routine_delete_title">Delete routine?</string>
+    <string name="routine_delete_message">Delete “%1$s” and all its stretches?</string>
+    <string name="routine_keep_one">Keep at least one routine</string>
+    <string name="routine_choose_title">Choose a routine</string>
+    <string name="routine_empty">No stretches yet. Tap + to add one.</string>
+    <string name="stretch_add_title">Add stretch</string>
+    <string name="stretch_edit_title">Edit stretch</string>
+    <string name="stretch_name_hint">Stretch name</string>
+    <string name="stretch_seconds_hint">Duration (seconds)</string>
+    <string name="stretch_instructions_hint">Instructions</string>
+    <string name="stretch_name_required">Enter a name</string>
+    <string name="stretch_seconds_required">Enter a duration in seconds</string>
+    <string name="stretch_seconds_label">%1$ds</string>
+    <string name="stretch_move_up">Move up</string>
+    <string name="stretch_move_down">Move down</string>
+    <string name="stretch_delete_title">Delete stretch?</string>
+    <string name="stretch_delete_message">Remove “%1$s” from this routine?</string>
+    <string name="stretch_progress">Stretch %1$d of %2$d</string>
+
     <!-- Quote management -->
     <string name="manage_quotes">Manage quotes</string>
     <string name="quote_management_title">Quotes</string>
