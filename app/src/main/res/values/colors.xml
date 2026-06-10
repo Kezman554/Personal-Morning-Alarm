@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Statistics: success/failure/empty states (chart bars, heatmap, history) -->
+    <color name="stat_success">#FF4CAF50</color>
+    <color name="stat_failure">#FFE57373</color>
+    <!-- Translucent grey so empty cells read on both light and dark themes -->
+    <color name="stat_empty">#33888888</color>
 </resources>

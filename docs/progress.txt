@@ -475,3 +475,30 @@
     onDestroy alongside stretchTimer
   - Built + installed on SM-A326B. On-device check (shake -> Stage 2 -> quote gap ->
     Continue disabled 15s then enables) needs a physical run — Nick to confirm
+
+2026-06-10  Statistics screen (streaks, weekly chart, heatmap, history)
+  - StatisticsFragment was a placeholder; built the full screen. StatisticsViewModel
+    derives a StatisticsUiState off repository.observeEvents() (same reactive pattern
+    as HomeViewModel): currentStreak + longestStreak (existing repo helpers), four
+    trailing 7-day WeekBar buckets, 28-day DayCell grid, and the full event history.
+    Multiple events on one date collapse to the latest (by timestamp) for the grid +
+    week buckets; history shows every event
+  - CHART CHOICE: custom Canvas views, NOT MPAndroidChart. The APK is already ~28 MB
+    (over PRD's 20 MB; ML Kit), and MPAndroidChart needs the JitPack repo added to
+    settings.gradle (currently FAIL_ON_PROJECT_REPOS, google+mavenCentral only). The
+    two charts here are trivial, so a dependency + repo change wasn't worth it
+    * WeeklyBarChartView: one bar per week, height = success fraction, "S/A" or "—"
+      label on top, week-start date below. Faint track shows empty weeks
+    * DayHeatmapView: 7-col rounded-square grid, green/red/grey by DayOutcome; square
+      cells, height derived from width in onMeasure
+    * Both resolve colorPrimary/colorOnSurface via theme (adapt to dark/light) +
+      stat_success/stat_failure/stat_empty colors (stat_empty is translucent grey so
+      it reads on both themes)
+  - EventHistoryAdapter (ListAdapter + DiffUtil, like NfcTagAdapter): date "EEE d MMM",
+    ✓/✗ glyph (green/red), goal + duration ("1:25" >=60s else "45s") or "missed".
+    item_event_history.xml. RecyclerView nested in the ScrollView with
+    nestedScrollingEnabled=false
+  - VERIFIED on device (SM-A326B, real DB — 6 events 06-03..06-10): current/longest
+    streak 1/1; bars "— / — / 0/1 / 4/5" (4 Jun filled ~80%); heatmap greens for
+    04/06/08/10 Jun, red for 07 (nuclear) + 03 Jun, grey gaps; history list dates/
+    goals/durations/glyphs all correct. testDebugUnitTest green; no regressions

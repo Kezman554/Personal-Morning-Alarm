@@ -122,6 +122,27 @@
     <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
     <string name="home_dev_tools">Dev tools</string>
 
+    <!-- Statistics screen -->
+    <string name="stats_current_streak">Current streak</string>
+    <string name="stats_longest_streak">Longest streak</string>
+    <string name="stats_days_unit">days</string>
+    <string name="stats_day_unit">day</string>
+    <string name="stats_weeks_title">Weekly success rate</string>
+    <string name="stats_weeks_subtitle">Last 4 weeks</string>
+    <string name="stats_heatmap_title">Daily history</string>
+    <string name="stats_heatmap_subtitle">Last 4 weeks</string>
+    <string name="stats_history_title">History</string>
+    <string name="stats_history_empty">No wake-ups recorded yet.</string>
+    <string name="stats_legend_success">Done</string>
+    <string name="stats_legend_failure">Missed</string>
+    <string name="stats_legend_none">No alarm</string>
+    <string name="stats_week_rate">%1$d/%2$d</string>
+    <string name="stats_history_success">✓</string>
+    <string name="stats_history_failure">✗</string>
+    <!-- Secondary line: "Exercise · 1:25" (success) or "Exercise · missed" (failure) -->
+    <string name="stats_history_detail">%1$s · %2$s</string>
+    <string name="stats_history_missed">missed</string>
+
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>
     <string name="test_countdown">Test countdown (15s)</string>
