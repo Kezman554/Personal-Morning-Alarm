@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.personalmorningalarm.data.entity.BundledQuote
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BundledQuoteDao {
@@ -25,6 +26,10 @@ interface BundledQuoteDao {
 
     @Query("SELECT * FROM bundled_quotes ORDER BY id ASC")
     suspend fun getAll(): List<BundledQuote>
+
+    /** Reactive stream of all quotes; drives the quote-management list. */
+    @Query("SELECT * FROM bundled_quotes ORDER BY id ASC")
+    fun observeAll(): Flow<List<BundledQuote>>
 
     @Query("SELECT COUNT(*) FROM bundled_quotes")
     suspend fun count(): Int

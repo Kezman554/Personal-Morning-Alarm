@@ -122,6 +122,21 @@
     <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
     <string name="home_dev_tools">Dev tools</string>
 
+    <!-- Quote management -->
+    <string name="manage_quotes">Manage quotes</string>
+    <string name="quote_management_title">Quotes</string>
+    <string name="quote_count">%1$d quotes</string>
+    <string name="quote_count_one">1 quote</string>
+    <string name="quotes_empty">No quotes yet. Tap + to add one.</string>
+    <string name="quote_add_title">Add quote</string>
+    <string name="quote_edit_title">Edit quote</string>
+    <string name="quote_text_hint">Quote</string>
+    <string name="quote_author_hint">Author (optional)</string>
+    <string name="quote_text_required">Enter some quote text</string>
+    <string name="delete_quote_title">Delete quote?</string>
+    <string name="delete_quote_message">Remove this quote from the pool?</string>
+    <string name="quote_keep_one">Keep at least one quote</string>
+
     <!-- Alarm PIN -->
     <string name="pin_section_title">Alarm PIN</string>
     <string name="pin_section_explainer">Protects the alarm time, on/off switch, and Stage 2 time limit so you can\'t change them half-asleep.</string>

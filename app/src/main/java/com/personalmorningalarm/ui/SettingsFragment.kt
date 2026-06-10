@@ -54,6 +54,10 @@ class SettingsFragment : Fragment() {
             findNavController().navigate(R.id.action_settings_to_nfcTags)
         }
 
+        binding.btnManageQuotes.setOnClickListener {
+            findNavController().navigate(R.id.action_settings_to_quotes)
+        }
+
         // Stage 2 time limit — PIN-protected before the picker opens.
         binding.rowStage2Duration.setOnClickListener {
             PinPrompts.guard(requireContext(), pinManager) { showStage2DurationDialog() }

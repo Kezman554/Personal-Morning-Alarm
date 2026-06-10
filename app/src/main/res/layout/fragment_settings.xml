@@ -112,6 +112,14 @@
             android:layout_marginTop="8dp"
             android:text="@string/toggle_placeholder" />
 
+        <Button
+            android:id="@+id/btn_manage_quotes"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/manage_quotes" />
+
         <!-- Stage 2 time limit (PIN-protected) -->
         <TextView
             android:layout_width="wrap_content"

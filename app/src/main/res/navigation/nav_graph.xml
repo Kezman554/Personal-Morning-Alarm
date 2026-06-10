@@ -25,6 +25,9 @@
         <action
             android:id="@+id/action_settings_to_nfcTags"
             app:destination="@id/nfcTagsFragment" />
+        <action
+            android:id="@+id/action_settings_to_quotes"
+            app:destination="@id/quoteManagementFragment" />
     </fragment>
 
     <fragment
@@ -32,5 +35,11 @@
         android:name="com.personalmorningalarm.ui.NfcTagsFragment"
         android:label="@string/nfc_tags_screen_title"
         tools:layout="@layout/fragment_nfc_tags" />
+
+    <fragment
+        android:id="@+id/quoteManagementFragment"
+        android:name="com.personalmorningalarm.ui.QuoteManagementFragment"
+        android:label="@string/quote_management_title"
+        tools:layout="@layout/fragment_quote_management" />
 
 </navigation>

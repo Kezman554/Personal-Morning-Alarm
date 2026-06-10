@@ -61,7 +61,10 @@ class AlarmRepository(private val db: AppDatabase) {
     // --- Bundled quotes ---
     suspend fun addQuote(quote: BundledQuote): Long = bundledQuoteDao.insert(quote)
     suspend fun addQuotes(quotes: List<BundledQuote>) = bundledQuoteDao.insertAll(quotes)
+    suspend fun updateQuote(quote: BundledQuote) = bundledQuoteDao.update(quote)
+    suspend fun deleteQuote(quote: BundledQuote) = bundledQuoteDao.delete(quote)
     suspend fun getAllQuotes(): List<BundledQuote> = bundledQuoteDao.getAll()
+    fun observeQuotes(): Flow<List<BundledQuote>> = bundledQuoteDao.observeAll()
     suspend fun getRandomQuote(): BundledQuote? = bundledQuoteDao.getRandom()
     suspend fun getQuoteCount(): Int = bundledQuoteDao.count()
 

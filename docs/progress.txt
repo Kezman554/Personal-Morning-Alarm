@@ -532,3 +532,33 @@
     switch + Stage 2 row both prompted (switch unchanged after cancel); Stage 2 picker
     opened on correct PIN; disable 1234 -> "No PIN set", controls open freely again.
     Build + testDebugUnitTest green; device left in clean no-PIN state
+
+2026-06-10  Quote pool management UI
+  - New QuoteManagementFragment (Settings -> "Manage quotes" button): RecyclerView
+    of all quotes with optional italic "— Author"; count header ("N quotes" / "1
+    quote"); FloatingActionButton (+, new ic_add) to add; tap a row to edit; swipe
+    left/right (ItemTouchHelper) to delete with a confirm dialog. Add/edit share one
+    dialog_quote_edit (TextInputLayouts: Quote + optional Author); blank quote text
+    keeps the dialog open (positive button overridden in setOnShowListener)
+  - QuoteManagementViewModel: quotes StateFlow off the new repository.observeQuotes();
+    add/update (author trimmed, blank -> null) + delete with a LAST-QUOTE GUARD (pool
+    must keep >=1 so the quote content screen always has something). deleteQuote reports
+    success via callback so a blocked/cancelled swipe restores the row (notifyItemChanged);
+    the fragment also blocks the swipe when size<=1, so it's guarded in two places
+  - Data layer: BundledQuoteDao.observeAll() (Flow); repository observeQuotes /
+    updateQuote / deleteQuote (only add/get existed before). nav_graph:
+    quoteManagementFragment + action_settings_to_quotes
+  - Stage 2 needed NO change: it already picks via getRandomQuote() = "ORDER BY RANDOM()
+    LIMIT 1" over the whole table, so any custom quote is automatically eligible
+  - VERIFIED on device (SM-A326B, adb/uiautomator-driven): list showed "40 quotes" with
+    authors + FAB; added "Rise and grind, sleepyhead / Nick" -> "41 quotes", shown with
+    author; edited a bundled quote (text changed, count stayed 41); swipe -> "Delete
+    quote?" confirm -> delete -> "40 quotes", row gone. Step 4 (custom quote can appear
+    in Stage 2) confirmed at the mechanism level: pulled the DB and ran Stage 2's exact
+    query 400x — the custom quote was selected 6/400 (~1/41 as expected). A physical
+    shake-through is still Nick's to confirm
+  - Restored the one bundled quote deleted during testing (re-added Mark Twain); left the
+    custom "Rise and grind, sleepyhead" in place so Nick can see it surface in Stage 2.
+    Pool now 41 = 40 original bundled + 1 custom. Build + testDebugUnitTest green
+  - NOT exercised live: the last-quote guard (would need deleting 40 quotes); enforced in
+    code (VM count<=1 + fragment size<=1)
