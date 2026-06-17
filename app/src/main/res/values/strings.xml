@@ -122,6 +122,22 @@
     <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
     <string name="home_dev_tools">Dev tools</string>
 
+    <!-- Appearance / theme -->
+    <string name="theme_section_title">Appearance</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">Follow system</string>
+
+    <!-- Battery optimisation -->
+    <string name="battery_section_title">Battery</string>
+    <string name="battery_status_optimised">Battery optimisation is on — alarms may be delayed or missed.</string>
+    <string name="battery_status_whitelisted">Whitelisted — alarms can run reliably.</string>
+    <string name="battery_button">Allow background running</string>
+    <string name="battery_dialog_title">Allow background running</string>
+    <string name="battery_dialog_message">To make sure your alarm fires reliably every morning, allow the app to ignore battery optimisation. Otherwise Android may delay or stop the alarm to save power.</string>
+    <string name="battery_open_settings">Open settings</string>
+    <string name="battery_not_now">Not now</string>
+
     <!-- Alarm sounds & volume -->
     <string name="sound_section_title">Alarm sounds &amp; volume</string>
     <string name="sound_stage1_label">Wake-up sound</string>

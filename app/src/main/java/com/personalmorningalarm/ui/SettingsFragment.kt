@@ -23,8 +23,11 @@ import com.personalmorningalarm.data.model.AlarmSounds
 import com.personalmorningalarm.data.model.ContentType
 import com.personalmorningalarm.databinding.DialogDurationSliderBinding
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
+import com.personalmorningalarm.util.BatteryOptimisationHelper
 import com.personalmorningalarm.util.PinManager
 import com.personalmorningalarm.util.SoundPreviewPlayer
+import com.personalmorningalarm.util.ThemeManager
+import com.personalmorningalarm.util.ThemeMode
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -38,6 +41,7 @@ class SettingsFragment : Fragment() {
     }
 
     private lateinit var pinManager: PinManager
+    private lateinit var themeManager: ThemeManager
     private val preview = SoundPreviewPlayer()
 
     /** Cached so the Stage 2 picker dialog opens on the current saved value. */
@@ -60,6 +64,25 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         pinManager = PinManager(requireContext())
+        themeManager = ThemeManager(requireContext())
+
+        // Theme: per-button onClick (not the group listener) so setting the initial
+        // checked state below doesn't loop. Changing it recreates the activity, so the
+        // new theme shows immediately.
+        binding.rgTheme.check(
+            when (themeManager.getThemeMode()) {
+                ThemeMode.LIGHT -> R.id.rb_theme_light
+                ThemeMode.DARK -> R.id.rb_theme_dark
+                ThemeMode.SYSTEM -> R.id.rb_theme_system
+            }
+        )
+        binding.rbThemeLight.setOnClickListener { themeManager.setThemeMode(ThemeMode.LIGHT) }
+        binding.rbThemeDark.setOnClickListener { themeManager.setThemeMode(ThemeMode.DARK) }
+        binding.rbThemeSystem.setOnClickListener { themeManager.setThemeMode(ThemeMode.SYSTEM) }
+
+        binding.btnBattery.setOnClickListener {
+            BatteryOptimisationHelper.showExplanationDialog(requireContext())
+        }
 
         binding.btnManageTags.setOnClickListener {
             findNavController().navigate(R.id.action_settings_to_nfcTags)
@@ -312,6 +335,20 @@ class SettingsFragment : Fragment() {
         const val MIN_STAGE2_DURATION = 5
         const val MAX_STAGE2_DURATION = 15
         const val DEFAULT_STAGE2_DURATION = 10
+    }
+
+    override fun onResume() {
+        super.onResume()
+        renderBatteryStatus()
+    }
+
+    /** Reflects the current battery-optimisation state (refreshed on return). */
+    private fun renderBatteryStatus() {
+        val ignoring = BatteryOptimisationHelper.isIgnoringBatteryOptimizations(requireContext())
+        binding.tvBatteryStatus.text = getString(
+            if (ignoring) R.string.battery_status_whitelisted else R.string.battery_status_optimised
+        )
+        binding.btnBattery.isEnabled = !ignoring
     }
 
     override fun onPause() {

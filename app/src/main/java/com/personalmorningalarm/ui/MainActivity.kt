@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.personalmorningalarm.databinding.ActivityMainBinding
+import com.personalmorningalarm.util.BatteryOptimisationHelper
 
 class MainActivity : AppCompatActivity() {
 
@@ -18,5 +19,13 @@ class MainActivity : AppCompatActivity() {
         val navHostFragment = supportFragmentManager
             .findFragmentById(binding.navHostFragment.id) as NavHostFragment
         binding.bottomNav.setupWithNavController(navHostFragment.navController)
+
+        // Once, on first launch, nudge the user to whitelist the app so alarms fire
+        // reliably. savedInstanceState guards against re-showing on recreation
+        // (e.g. when a theme change recreates the activity).
+        if (savedInstanceState == null && BatteryOptimisationHelper.shouldPromptOnLaunch(this)) {
+            BatteryOptimisationHelper.markPrompted(this)
+            BatteryOptimisationHelper.showExplanationDialog(this)
+        }
     }
 }

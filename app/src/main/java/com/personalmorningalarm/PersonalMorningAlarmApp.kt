@@ -10,6 +10,7 @@ import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.StretchExercise
 import com.personalmorningalarm.data.entity.StretchRoutine
 import com.personalmorningalarm.data.model.ContentType
+import com.personalmorningalarm.util.ThemeManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,9 @@ class PersonalMorningAlarmApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Apply the saved theme before any activity is created.
+        ThemeManager(this).applySaved()
+
         val repository = AlarmRepository(AppDatabase.getInstance(this))
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             if (repository.getQuoteCount() == 0) {

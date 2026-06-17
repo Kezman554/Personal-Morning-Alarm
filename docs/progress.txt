@@ -602,6 +602,32 @@
     preview/playback wiring confirmed (valid WAVs, no MediaPlayer errors), real loudness
     is Nick's to confirm
 
+2026-06-17  Theme + battery-optimisation settings
+  - THEME: util/ThemeManager (ThemeMode LIGHT/DARK/SYSTEM -> AppCompatDelegate night
+    modes) persisted in shared prefs "pma_settings". Applied from
+    PersonalMorningAlarmApp.onCreate (applySaved) so the right theme is set from app
+    start; setThemeMode() calls setDefaultNightMode which recreates the live activity so
+    the change shows immediately. Settings "Appearance" radio group (Light/Dark/Follow
+    system); base theme is already Material3 DayNight so both modes render
+  - BATTERY: util/BatteryOptimisationHelper — isIgnoringBatteryOptimizations
+    (PowerManager), an explanation dialog, and requestExemption (ACTION_REQUEST_IGNORE_
+    BATTERY_OPTIMIZATIONS with a package: uri, falling back to the settings list).
+    Manifest gained REQUEST_IGNORE_BATTERY_OPTIMIZATIONS. One-shot launch prompt
+    (shouldPromptOnLaunch / markPrompted, flag in pma_settings) shown from
+    MainActivity.onCreate when not whitelisted; Settings "Battery" section shows status
+    (optimised vs whitelisted, refreshed in onResume) + an "Allow background running"
+    button that opens the same dialog
+  - VERIFIED on device (SM-A326B, once Nick unlocked it): fresh launch showed the
+    first-launch "Allow background running" dialog; Open settings -> the real
+    RequestIgnoreBatteryOptimizations system prompt -> Allow whitelisted the app
+    (deviceidle whitelist confirmed) and the Settings status flipped to "Whitelisted"
+    with the button disabled. Theme: Light and Dark both applied IMMEDIATELY (activity
+    recreated in place); Light survived a force-stop+relaunch despite the device being in
+    dark mode, proving the saved choice is applied on app start. assembleDebug +
+    testDebugUnitTest green
+  - Left for Nick: theme back to Follow-system (default); app left WHITELISTED (better
+    for real alarms); battery_prompted flag set so the one-shot launch prompt won't recur
+
 2026-06-10  Stretch routine system (entities, management UI, Stage 2 integration)
   - DATA: two new entities — StretchRoutine (id, name, isActive, createdAt) and
     StretchExercise (id, routineId FK CASCADE, name, durationSeconds, instructions,
