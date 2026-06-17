@@ -43,6 +43,18 @@ data class AlarmConfig(
     /** Routine used when [matchRoutineToGoal] and goal is PROJECT (0 = unset). */
     val projectRoutineId: Long = 0,
 
+    /** Key of the bundled Stage 1 sound (see AlarmSounds; blank = default). */
+    val stage1SoundId: String = "",
+
+    /** Key of the bundled nuclear-alarm sound (blank = default). */
+    val nuclearSoundId: String = "",
+
+    /** Stage 1 playback volume, 0-100 (scales the MediaPlayer within the alarm stream). */
+    val stage1Volume: Int = 100,
+
+    /** Whether the nuclear alarm vibrates (Stage 1 is sound-only by design). */
+    val vibrationEnabled: Boolean = true,
+
     /** Epoch millis the config was created. */
     val createdAt: Long = System.currentTimeMillis()
 )

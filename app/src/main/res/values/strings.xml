@@ -122,6 +122,16 @@
     <string name="home_exact_alarm_needed">Allow “Alarms &amp; reminders”, then turn the alarm on again</string>
     <string name="home_dev_tools">Dev tools</string>
 
+    <!-- Alarm sounds & volume -->
+    <string name="sound_section_title">Alarm sounds &amp; volume</string>
+    <string name="sound_stage1_label">Wake-up sound</string>
+    <string name="sound_nuclear_label">Nuclear alarm sound</string>
+    <string name="sound_preview">Preview</string>
+    <string name="sound_pick_stage1_title">Wake-up sound</string>
+    <string name="sound_pick_nuclear_title">Nuclear alarm sound</string>
+    <string name="volume_stage1_label">Stage 1 volume</string>
+    <string name="vibration_toggle">Vibrate during nuclear alarm</string>
+
     <!-- Stretch routines -->
     <string name="manage_routines">Manage stretch routines</string>
     <string name="routines_title">Stretch routines</string>

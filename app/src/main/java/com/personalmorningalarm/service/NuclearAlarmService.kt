@@ -11,8 +11,6 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -24,7 +22,15 @@ import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.personalmorningalarm.R
+import com.personalmorningalarm.data.AlarmRepository
+import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.model.AlarmSounds
 import com.personalmorningalarm.ui.NuclearDismissalActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * The nuclear alarm: Stage 2's failure state. Triggered when the Stage 2
@@ -45,6 +51,7 @@ class NuclearAlarmService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val strobeHandler = Handler(Looper.getMainLooper())
     private var cameraManager: CameraManager? = null
@@ -73,15 +80,21 @@ class NuclearAlarmService : Service() {
         Log.d(TAG, "NuclearAlarmService starting (foreground)")
         startForeground(NOTIFICATION_ID, buildNotification())
         isRunning = true
-        startNuclearSound()
-        startVibration()
         if (STROBE_ENABLED) startStrobe()
+        // Read the chosen sound + vibration setting off the main thread.
+        scope.launch {
+            val config =
+                AlarmRepository(AppDatabase.getInstance(this@NuclearAlarmService)).getCurrentConfig()
+            startNuclearSound(AlarmSounds.nuclearByKey(config?.nuclearSoundId).resId)
+            if (config?.vibrationEnabled != false) startVibration()
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
         Log.d(TAG, "NuclearAlarmService stopping")
         isRunning = false
+        scope.cancel()
         mediaPlayer?.run {
             if (isPlaying) stop()
             release()
@@ -94,19 +107,13 @@ class NuclearAlarmService : Service() {
 
     // --- Sound ---
 
-    private fun startNuclearSound() {
-        // Distinct from Stage 1: use the RINGTONE default (Stage 1 uses ALARM),
-        // falling back to ALARM then NOTIFICATION so we always have something.
-        val uri: Uri =
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-
+    private fun startNuclearSound(resId: Int) {
         if (FORCE_MAX_VOLUME) forceMaxAlarmVolume()
 
         try {
+            val afd = resources.openRawResourceFd(resId) ?: return
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(this@NuclearAlarmService, uri)
+                afd.use { setDataSource(it.fileDescriptor, it.startOffset, it.length) }
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)

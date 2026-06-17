@@ -32,36 +32,37 @@ class SettingsViewModel(private val repository: AlarmRepository) : ViewModel() {
         .map { it?.stage2DurationMinutes ?: DEFAULT_STAGE2_DURATION }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DEFAULT_STAGE2_DURATION)
 
-    fun setSequenceLength(length: Int) {
-        viewModelScope.launch {
-            val current = repository.getCurrentConfig()
-            if (current == null) {
-                repository.saveConfig(
-                    AlarmConfig(
-                        alarmTime = HomeViewModel.DEFAULT_ALARM_MINUTES,
-                        isEnabled = false,
-                        sequenceLength = length
-                    )
-                )
-            } else {
-                repository.updateConfig(current.copy(sequenceLength = length))
-            }
-        }
-    }
+    /** Full current config, for the sound/volume/vibration controls. */
+    val config: StateFlow<AlarmConfig?> = repository.observeCurrentConfig()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    fun setStage2Duration(minutes: Int) {
+    fun setSequenceLength(length: Int) = persist { it.copy(sequenceLength = length) }
+
+    fun setStage2Duration(minutes: Int) = persist { it.copy(stage2DurationMinutes = minutes) }
+
+    fun setStage1Sound(key: String) = persist { it.copy(stage1SoundId = key) }
+
+    fun setNuclearSound(key: String) = persist { it.copy(nuclearSoundId = key) }
+
+    fun setStage1Volume(volume: Int) = persist { it.copy(stage1Volume = volume) }
+
+    fun setVibrationEnabled(enabled: Boolean) = persist { it.copy(vibrationEnabled = enabled) }
+
+    /**
+     * Applies [transform] to the single config row (updating in place, or creating a
+     * disabled default if none exists yet) so config rows don't accumulate.
+     */
+    private fun persist(transform: (AlarmConfig) -> AlarmConfig) {
         viewModelScope.launch {
             val current = repository.getCurrentConfig()
             if (current == null) {
                 repository.saveConfig(
-                    AlarmConfig(
-                        alarmTime = HomeViewModel.DEFAULT_ALARM_MINUTES,
-                        isEnabled = false,
-                        stage2DurationMinutes = minutes
+                    transform(
+                        AlarmConfig(alarmTime = HomeViewModel.DEFAULT_ALARM_MINUTES, isEnabled = false)
                     )
                 )
             } else {
-                repository.updateConfig(current.copy(stage2DurationMinutes = minutes))
+                repository.updateConfig(transform(current))
             }
         }
     }

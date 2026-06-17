@@ -9,14 +9,20 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.personalmorningalarm.R
+import com.personalmorningalarm.data.AlarmRepository
+import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.model.AlarmSounds
 import com.personalmorningalarm.ui.AlarmDismissalActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Foreground service that drives the Stage 1 alarm: plays a looping alarm tone
@@ -31,6 +37,7 @@ import com.personalmorningalarm.ui.AlarmDismissalActivity
 class AlarmService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -48,13 +55,20 @@ class AlarmService : Service() {
         Log.d(TAG, "AlarmService starting (foreground)")
         startForeground(NOTIFICATION_ID, buildNotification())
         isRunning = true
-        startAlarmSound()
+        // Read the chosen sound + volume off the main thread, then start playback.
+        scope.launch {
+            val config = AlarmRepository(AppDatabase.getInstance(this@AlarmService)).getCurrentConfig()
+            val sound = AlarmSounds.stage1ByKey(config?.stage1SoundId)
+            val volume = (config?.stage1Volume ?: 100).coerceIn(0, 100) / 100f
+            startAlarmSound(sound.resId, volume)
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
         Log.d(TAG, "AlarmService stopping")
         isRunning = false
+        scope.cancel()
         mediaPlayer?.run {
             if (isPlaying) stop()
             release()
@@ -91,12 +105,11 @@ class AlarmService : Service() {
             .build()
     }
 
-    private fun startAlarmSound() {
-        val alarmUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+    private fun startAlarmSound(resId: Int, volume: Float) {
         try {
+            val afd = resources.openRawResourceFd(resId) ?: return
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(this@AlarmService, alarmUri)
+                afd.use { setDataSource(it.fileDescriptor, it.startOffset, it.length) }
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -105,6 +118,7 @@ class AlarmService : Service() {
                 )
                 isLooping = true
                 prepare()
+                setVolume(volume, volume) // scales within the device alarm stream
                 start()
             }
         } catch (e: Exception) {

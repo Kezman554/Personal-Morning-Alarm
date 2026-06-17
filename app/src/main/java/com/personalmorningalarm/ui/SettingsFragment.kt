@@ -5,20 +5,26 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.NumberPicker
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.slider.Slider
 import com.personalmorningalarm.R
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.entity.AlarmConfig
+import com.personalmorningalarm.data.model.AlarmSound
+import com.personalmorningalarm.data.model.AlarmSounds
 import com.personalmorningalarm.data.model.ContentType
+import com.personalmorningalarm.databinding.DialogDurationSliderBinding
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
 import com.personalmorningalarm.util.PinManager
+import com.personalmorningalarm.util.SoundPreviewPlayer
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -32,9 +38,14 @@ class SettingsFragment : Fragment() {
     }
 
     private lateinit var pinManager: PinManager
+    private val preview = SoundPreviewPlayer()
 
     /** Cached so the Stage 2 picker dialog opens on the current saved value. */
     private var stage2Duration: Int = DEFAULT_STAGE2_DURATION
+
+    // Cached current sound keys so the row Preview buttons play the saved choice.
+    private var stage1SoundKey: String = AlarmSounds.defaultStage1.key
+    private var nuclearSoundKey: String = AlarmSounds.defaultNuclear.key
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -62,7 +73,37 @@ class SettingsFragment : Fragment() {
             findNavController().navigate(R.id.action_settings_to_routines)
         }
 
-        // Stage 2 time limit — PIN-protected before the picker opens.
+        // Alarm sounds: tap a row to pick (previewing each), or Preview the saved one.
+        binding.rowStage1Sound.setOnClickListener {
+            pickSound(R.string.sound_pick_stage1_title, AlarmSounds.stage1, stage1SoundKey) {
+                viewModel.setStage1Sound(it)
+            }
+        }
+        binding.btnPreviewStage1.setOnClickListener {
+            preview.play(requireContext(), AlarmSounds.stage1ByKey(stage1SoundKey).resId)
+        }
+        binding.rowNuclearSound.setOnClickListener {
+            pickSound(R.string.sound_pick_nuclear_title, AlarmSounds.nuclear, nuclearSoundKey) {
+                viewModel.setNuclearSound(it)
+            }
+        }
+        binding.btnPreviewNuclear.setOnClickListener {
+            preview.play(requireContext(), AlarmSounds.nuclearByKey(nuclearSoundKey).resId)
+        }
+
+        // Volume: persist once on release (not on every drag tick).
+        binding.sliderVolume.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                viewModel.setStage1Volume(slider.value.toInt())
+            }
+        })
+
+        binding.switchVibration.setOnClickListener {
+            viewModel.setVibrationEnabled(binding.switchVibration.isChecked)
+        }
+
+        // Stage 2 time limit — PIN-protected before the slider opens.
         binding.rowStage2Duration.setOnClickListener {
             PinPrompts.guard(requireContext(), pinManager) { showStage2DurationDialog() }
         }
@@ -135,6 +176,12 @@ class SettingsFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.config.collect(::renderSoundSettings)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.contentToggles.collect { toggles ->
                     toggles.forEach { t ->
                         when (t.contentType) {
@@ -194,18 +241,61 @@ class SettingsFragment : Fragment() {
         binding.btnDisablePin.visibility = if (pinSet) View.VISIBLE else View.GONE
     }
 
-    /** Number-picker dialog (5–15 min) for the Stage 2 time limit. */
+    /** Reflects saved sound choices, volume, and vibration onto the controls. */
+    private fun renderSoundSettings(config: AlarmConfig?) {
+        val stage1 = AlarmSounds.stage1ByKey(config?.stage1SoundId)
+        val nuclear = AlarmSounds.nuclearByKey(config?.nuclearSoundId)
+        stage1SoundKey = stage1.key
+        nuclearSoundKey = nuclear.key
+        binding.tvStage1Sound.text = stage1.displayName
+        binding.tvNuclearSound.text = nuclear.displayName
+
+        val volume = (config?.stage1Volume ?: 100).coerceIn(0, 100).toFloat()
+        if (binding.sliderVolume.value != volume) binding.sliderVolume.value = volume
+
+        binding.switchVibration.isChecked = config?.vibrationEnabled ?: true
+    }
+
+    /**
+     * Single-choice sound picker that previews each sound as it's tapped, saving
+     * only on confirm. Preview stops when the dialog closes.
+     */
+    private fun pickSound(
+        @StringRes title: Int,
+        sounds: List<AlarmSound>,
+        currentKey: String,
+        onPick: (String) -> Unit
+    ) {
+        val names = sounds.map { it.displayName }.toTypedArray()
+        var selected = sounds.indexOfFirst { it.key == currentKey }.coerceAtLeast(0)
+        AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setSingleChoiceItems(names, selected) { _, which ->
+                selected = which
+                preview.play(requireContext(), sounds[which].resId)
+            }
+            .setPositiveButton(R.string.save) { _, _ -> onPick(sounds[selected].key) }
+            .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener { preview.stop() }
+            .show()
+    }
+
+    /** Slider dialog (5–15 min) for the Stage 2 time limit. */
     private fun showStage2DurationDialog() {
-        val picker = NumberPicker(requireContext()).apply {
-            minValue = MIN_STAGE2_DURATION
-            maxValue = MAX_STAGE2_DURATION
-            value = stage2Duration.coerceIn(MIN_STAGE2_DURATION, MAX_STAGE2_DURATION)
-            wrapSelectorWheel = false
+        val dialogBinding = DialogDurationSliderBinding.inflate(layoutInflater)
+        val start = stage2Duration.coerceIn(MIN_STAGE2_DURATION, MAX_STAGE2_DURATION)
+        dialogBinding.sliderDuration.value = start.toFloat()
+        dialogBinding.tvDurationValue.text = getString(R.string.stage2_duration_value, start)
+        dialogBinding.sliderDuration.addOnChangeListener { _, value, _ ->
+            dialogBinding.tvDurationValue.text =
+                getString(R.string.stage2_duration_value, value.toInt())
         }
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.stage2_duration_dialog_title)
-            .setView(picker)
-            .setPositiveButton(R.string.save) { _, _ -> viewModel.setStage2Duration(picker.value) }
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.save) { _, _ ->
+                viewModel.setStage2Duration(dialogBinding.sliderDuration.value.toInt())
+            }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
@@ -224,8 +314,14 @@ class SettingsFragment : Fragment() {
         const val DEFAULT_STAGE2_DURATION = 10
     }
 
+    override fun onPause() {
+        super.onPause()
+        preview.stop() // don't let a preview keep playing after leaving Settings
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        preview.release()
         _binding = null
     }
 }

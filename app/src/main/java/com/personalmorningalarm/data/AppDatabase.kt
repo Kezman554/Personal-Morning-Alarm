@@ -32,7 +32,7 @@ import com.personalmorningalarm.data.entity.StretchRoutine
         StretchRoutine::class,
         StretchExercise::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -99,6 +99,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v5: Stage 1/nuclear sound selection, Stage 1 volume, vibration toggle on
+        // alarm_config. Non-destructive ALTERs with sensible defaults.
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN stage1SoundId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN nuclearSoundId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN stage1Volume INTEGER NOT NULL DEFAULT 100")
+                db.execSQL("ALTER TABLE alarm_config ADD COLUMN vibrationEnabled INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -108,7 +119,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     DB_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build().also { INSTANCE = it }
             }
         }
