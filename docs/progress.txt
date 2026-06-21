@@ -668,3 +668,25 @@
     first from the reorder test). Live shake-through display of the stretch screen still
     for Nick to confirm. NOTE: pre-existing cruft — alarm_config has ~46 accumulated rows
     from earlier dev; getCurrent() uses the latest, so behaviour is correct
+
+2026-06-21  Re-arm alarm on app launch (alarm silently stopped firing)
+  - BUG (Nick hit it for real, 2nd time): after the 06-17 sessions the 7am alarm
+    didn't fire on 06-18 or after, despite the toggle still showing ON. Diagnosed
+    on-device via dumpsys alarm: re-arm chain worked daily 06-10..06-17 (last fire
+    06-17 07:00 armed 06-18 07:00), but the 06-18 alarm was never delivered and was
+    no longer pending — no alarm_cancelled log for its PendingIntent, i.e. it was
+    dropped by a force-stop/stopped-state (the 06-17 dev sessions did force-stop +
+    relaunch cycles), not an explicit cancel. With no fire, nothing re-armed 06-19+
+  - ROOT CAUSE (structural): exact alarms are one-shot and only re-arm on fire
+    (AlarmReceiver) or reboot (BootReceiver). A single dropped/missed fire severs the
+    chain permanently, and the Home toggle reads isEnabled straight from the DB — so
+    it shows ON while nothing is actually scheduled. No self-healing path on app open
+  - FIX: MainActivity.rearmAlarmIfEnabled() — on every launch, off the main thread,
+    reads config and (if enabled + exact-alarm permission held) calls
+    scheduleDailyAlarm(). Idempotent (FLAG_UPDATE_CURRENT overwrites). Now simply
+    opening the app guarantees the next occurrence is armed, closing the force-stop /
+    missed-fire hole. Joins the existing fire-time + boot re-arm paths
+  - VERIFIED on device (SM-A326B): installDebug; launched -> logcat "Re-armed alarm
+    on launch (alarmTime=420, ok=true)"; dumpsys alarm now shows a live pending
+    RTC_WAKEUP for 2026-06-22 07:00:00 (exactAllowReason=policy_permission). Device
+    left armed for tomorrow 07:00, so Nick is covered regardless. assembleDebug clean
