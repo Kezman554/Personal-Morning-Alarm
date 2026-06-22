@@ -98,20 +98,21 @@ class SettingsFragment : Fragment() {
 
         // Alarm sounds: tap a row to pick (previewing each), or Preview the saved one.
         binding.rowStage1Sound.setOnClickListener {
-            pickSound(R.string.sound_pick_stage1_title, AlarmSounds.stage1, stage1SoundKey) {
+            pickSound(R.string.sound_pick_stage1_title, AlarmSounds.stage1, stage1SoundKey, stage1Volume()) {
                 viewModel.setStage1Sound(it)
             }
         }
         binding.btnPreviewStage1.setOnClickListener {
-            preview.play(requireContext(), AlarmSounds.stage1ByKey(stage1SoundKey).resId)
+            preview.play(requireContext(), AlarmSounds.stage1ByKey(stage1SoundKey), stage1Volume())
         }
         binding.rowNuclearSound.setOnClickListener {
-            pickSound(R.string.sound_pick_nuclear_title, AlarmSounds.nuclear, nuclearSoundKey) {
+            // Nuclear always plays at full volume, so preview it at full too.
+            pickSound(R.string.sound_pick_nuclear_title, AlarmSounds.nuclear, nuclearSoundKey, 1f) {
                 viewModel.setNuclearSound(it)
             }
         }
         binding.btnPreviewNuclear.setOnClickListener {
-            preview.play(requireContext(), AlarmSounds.nuclearByKey(nuclearSoundKey).resId)
+            preview.play(requireContext(), AlarmSounds.nuclearByKey(nuclearSoundKey), 1f)
         }
 
         // Volume: persist once on release (not on every drag tick).
@@ -279,6 +280,9 @@ class SettingsFragment : Fragment() {
         binding.switchVibration.isChecked = config?.vibrationEnabled ?: true
     }
 
+    /** The live Stage 1 volume slider value as a 0f-1f fraction, for previews. */
+    private fun stage1Volume(): Float = (binding.sliderVolume.value / 100f).coerceIn(0f, 1f)
+
     /**
      * Single-choice sound picker that previews each sound as it's tapped, saving
      * only on confirm. Preview stops when the dialog closes.
@@ -287,6 +291,7 @@ class SettingsFragment : Fragment() {
         @StringRes title: Int,
         sounds: List<AlarmSound>,
         currentKey: String,
+        previewVolume: Float,
         onPick: (String) -> Unit
     ) {
         val names = sounds.map { it.displayName }.toTypedArray()
@@ -295,7 +300,7 @@ class SettingsFragment : Fragment() {
             .setTitle(title)
             .setSingleChoiceItems(names, selected) { _, which ->
                 selected = which
-                preview.play(requireContext(), sounds[which].resId)
+                preview.play(requireContext(), sounds[which], previewVolume)
             }
             .setPositiveButton(R.string.save) { _, _ -> onPick(sounds[selected].key) }
             .setNegativeButton(R.string.cancel, null)

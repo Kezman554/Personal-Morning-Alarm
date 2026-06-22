@@ -690,3 +690,41 @@
     on launch (alarmTime=420, ok=true)"; dumpsys alarm now shows a live pending
     RTC_WAKEUP for 2026-06-22 07:00:00 (exactAllowReason=policy_permission). Device
     left armed for tomorrow 07:00, so Nick is covered regardless. assembleDebug clean
+
+2026-06-22  Volume overhaul (alarm too quiet, restore old sound, nuclear unmutable)
+  - WHY: Nick's alarm fired but was too quiet to wake him. The 06-17 work had
+    replaced the original system alarm tone with 5 synthesized WAVs and made volume
+    a MediaPlayer.setVolume scale WITHIN the device alarm stream — so a low device
+    alarm slider made the app quiet regardless of the in-app setting, and the preview
+    ignored volume entirely (min/max sounded identical)
+  - NEW VOLUME MODEL (Stage 1): AlarmService now SETS the device alarm stream
+    (STREAM_ALARM) to the app-set volume % of max on every fire (applyAlarmStreamVolume),
+    and plays the MediaPlayer at full. So the in-app slider is the real loudness and the
+    alarm starts at the configured level each morning no matter where the slider was
+    left. AlarmDismissalActivity sets volumeControlStream = STREAM_ALARM, so the hardware
+    buttons turn the alarm down WHILE shaking; the next fire resets it. The in-app slider
+    (not the device slider) is now the quiet-testing safeguard
+  - OLD SOUND BACK: added "Default (system alarm)" as the first Stage 1 sound option
+    (AlarmSound.resId==0 -> resolves to RingtoneManager TYPE_ALARM default at playback).
+    It's now AlarmSounds.defaultStage1, so blank config picks it. AlarmSounds.setDataSource
+    centralises raw-res-vs-system-default playback for the services + preview. NOTE: Nick's
+    saved choice is still the 06-17 pick (gentle_warm_waves) — he selects "Default (system
+    alarm)" from the picker to get the original tone
+  - PREVIEW REFLECTS VOLUME: SoundPreviewPlayer.play now takes a volume (0f-1f) and
+    setVolume()s it. Settings passes the live slider value for Stage 1 previews (row +
+    picker), 1f for nuclear. Fixes the min==max preview bug
+  - NUCLEAR UNMUTABLE: NuclearAlarmService FORCE_MAX_VOLUME flipped false->true (forces
+    STREAM_ALARM to max on start); NuclearDismissalActivity now swallows VOLUME_UP/DOWN/
+    MUTE in onKeyDown AND onKeyUp (isBlockedKey), so the hardware buttons can't quieten or
+    mute it. The in-app slider does NOT affect nuclear (always max). TESTING NOTE: nuclear
+    is now genuinely loud — flip FORCE_MAX_VOLUME false temporarily to test quietly
+  - VERIFIED on device (SM-A326B): assembleDebug + testDebugUnitTest green; installDebug.
+    Fired the test alarm with the device alarm stream pre-set to 11/15 -> logcat
+    "Set alarm stream to 15/15 (100%)" (app vol is 100), proving the fire raises/resets
+    the stream. While Stage 1 was sounding, 4x VOLUME_DOWN keyevents dropped STREAM_ALARM
+    to 1 (turn-down-while-shaking confirmed routes to the alarm stream). force-stop to
+    silence (can't shake over adb) cancelled the pending alarm; relaunch re-armed 07:00
+    ("Re-armed alarm on launch"). NOT verified over adb (no audio capture / would blast
+    the house): actual loudness of system-default tone, preview tracking the slider by
+    ear, and the nuclear force-max + volume-key block live — Nick to confirm by ear.
+    Picker entry is static compiled code (first in AlarmSounds.stage1) so guaranteed present

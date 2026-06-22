@@ -260,10 +260,24 @@ class NuclearDismissalActivity : AppCompatActivity() {
      * intercepted on stock Android.
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
-            return true
-        }
+        if (isBlockedKey(keyCode)) return true
         return super.onKeyDown(keyCode, event)
+    }
+
+    // Volume keys are handled on key-up too; swallow both so the nuclear alarm
+    // can't be turned down or muted with the hardware buttons.
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isBlockedKey(keyCode)) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isBlockedKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_BACK,
+        KeyEvent.KEYCODE_APP_SWITCH,
+        KeyEvent.KEYCODE_VOLUME_UP,
+        KeyEvent.KEYCODE_VOLUME_DOWN,
+        KeyEvent.KEYCODE_VOLUME_MUTE -> true
+        else -> false
     }
 
     override fun onUserLeaveHint() {

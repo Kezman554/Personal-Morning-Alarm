@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
@@ -106,6 +107,10 @@ class AlarmDismissalActivity : AppCompatActivity() {
         showWhenLockedAndTurnScreenOn()
 
         isSessionActive = true
+        // Hardware volume buttons adjust the alarm stream while the alarm sounds, so
+        // the user can turn Stage 1 down while shaking. AlarmService resets the stream
+        // to the app-set level on the next fire.
+        volumeControlStream = AudioManager.STREAM_ALARM
         binding = ActivityAlarmDismissalBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

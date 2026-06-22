@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
 import android.os.IBinder
@@ -59,8 +60,14 @@ class AlarmService : Service() {
         scope.launch {
             val config = AlarmRepository(AppDatabase.getInstance(this@AlarmService)).getCurrentConfig()
             val sound = AlarmSounds.stage1ByKey(config?.stage1SoundId)
-            val volume = (config?.stage1Volume ?: 100).coerceIn(0, 100) / 100f
-            startAlarmSound(sound.resId, volume)
+            val volumePercent = (config?.stage1Volume ?: 100).coerceIn(0, 100)
+            // Set the device alarm-stream level to the app-set volume so the alarm
+            // starts at the configured loudness every morning regardless of where the
+            // slider was left the previous day. The dismissal screen routes the
+            // hardware volume buttons to STREAM_ALARM, so it can still be turned down
+            // while shaking — but next fire resets it to this level.
+            applyAlarmStreamVolume(volumePercent)
+            startAlarmSound(sound)
         }
         return START_STICKY
     }
@@ -105,11 +112,21 @@ class AlarmService : Service() {
             .build()
     }
 
-    private fun startAlarmSound(resId: Int, volume: Float) {
+    /** Sets STREAM_ALARM to [percent] (0-100) of its maximum. */
+    private fun applyAlarmStreamVolume(percent: Int) {
+        runCatching {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val level = Math.round(percent / 100f * max).coerceIn(0, max)
+            am.setStreamVolume(AudioManager.STREAM_ALARM, level, 0)
+            Log.d(TAG, "Set alarm stream to $level/$max ($percent%)")
+        }.onFailure { Log.w(TAG, "Failed to set alarm stream volume", it) }
+    }
+
+    private fun startAlarmSound(sound: com.personalmorningalarm.data.model.AlarmSound) {
         try {
-            val afd = resources.openRawResourceFd(resId) ?: return
             mediaPlayer = MediaPlayer().apply {
-                afd.use { setDataSource(it.fileDescriptor, it.startOffset, it.length) }
+                AlarmSounds.setDataSource(this, this@AlarmService, sound)
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -118,7 +135,9 @@ class AlarmService : Service() {
                 )
                 isLooping = true
                 prepare()
-                setVolume(volume, volume) // scales within the device alarm stream
+                // Loudness is governed by the alarm stream level (set above); play at
+                // full MediaPlayer scale so the stream level is the single source of truth.
+                setVolume(1f, 1f)
                 start()
             }
         } catch (e: Exception) {

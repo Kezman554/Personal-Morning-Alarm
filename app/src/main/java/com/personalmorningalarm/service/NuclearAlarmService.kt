@@ -85,7 +85,7 @@ class NuclearAlarmService : Service() {
         scope.launch {
             val config =
                 AlarmRepository(AppDatabase.getInstance(this@NuclearAlarmService)).getCurrentConfig()
-            startNuclearSound(AlarmSounds.nuclearByKey(config?.nuclearSoundId).resId)
+            startNuclearSound(AlarmSounds.nuclearByKey(config?.nuclearSoundId))
             if (config?.vibrationEnabled != false) startVibration()
         }
         return START_STICKY
@@ -107,13 +107,12 @@ class NuclearAlarmService : Service() {
 
     // --- Sound ---
 
-    private fun startNuclearSound(resId: Int) {
+    private fun startNuclearSound(sound: com.personalmorningalarm.data.model.AlarmSound) {
         if (FORCE_MAX_VOLUME) forceMaxAlarmVolume()
 
         try {
-            val afd = resources.openRawResourceFd(resId) ?: return
             mediaPlayer = MediaPlayer().apply {
-                afd.use { setDataSource(it.fileDescriptor, it.startOffset, it.length) }
+                AlarmSounds.setDataSource(this, this@NuclearAlarmService, sound)
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -243,11 +242,13 @@ class NuclearAlarmService : Service() {
         const val ACTION_STOP = "com.personalmorningalarm.action.STOP_NUCLEAR"
 
         /**
-         * Production: force the alarm stream to maximum. Kept false so the device
-         * alarm-volume slider controls loudness during testing (the agreed
-         * safeguard against waking the house). Flip to true for the real alarm.
+         * Forces the alarm stream to maximum so the nuclear alarm cannot be quietened.
+         * Combined with NuclearDismissalActivity swallowing the volume keys, the nuclear
+         * alarm can't be turned down or muted with the hardware buttons. TESTING NOTE:
+         * this is genuinely loud — test where it won't wake the household, or flip this
+         * to false temporarily (the in-app slider does NOT affect nuclear).
          */
-        private const val FORCE_MAX_VOLUME = false
+        private const val FORCE_MAX_VOLUME = true
 
         /** Flashlight strobe is silent, so it stays on during testing. */
         private const val STROBE_ENABLED = true

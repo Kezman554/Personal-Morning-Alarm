@@ -49,7 +49,8 @@ data class AlarmConfig(
     /** Key of the bundled nuclear-alarm sound (blank = default). */
     val nuclearSoundId: String = "",
 
-    /** Stage 1 playback volume, 0-100 (scales the MediaPlayer within the alarm stream). */
+    /** Stage 1 volume, 0-100. AlarmService sets the device alarm stream to this level
+     *  on each fire, so it's the actual loudness regardless of the prior slider state. */
     val stage1Volume: Int = 100,
 
     /** Whether the nuclear alarm vibrates (Stage 1 is sound-only by design). */
