@@ -746,3 +746,43 @@
   - assembleDebug clean; installed on SM-A326B; relaunch re-armed 07:00. Audible
     behaviour (media-zero no longer silences preview; preview loudness matches the alarm)
     is Nick's to confirm by ear — adb can't capture audio
+
+2026-07-05  Unit test suite (56 tests across challenges, repository, ViewModels)
+  - Grew the test module from 2 files to 8; 56 tests, all green via ./gradlew test
+    (runs both testDebugUnitTest + testReleaseUnitTest)
+  - NEW TEST DEPS (app/build.gradle): Robolectric 4.13 + androidx.test:core + room-
+    testing + kotlinx-coroutines-test 1.7.3 (matches the transitive coroutines
+    version). testOptions.unitTests.includeAndroidResources=true so Robolectric can
+    run Room/framework code on the local JVM. src/test/resources/robolectric.properties
+    pins sdk=33 (compileSdk 35 isn't supported by Robolectric 4.13; 33 = the A32 test
+    device anyway)
+  - MathChallengeTest (pure JVM, 7): answer validation (whitespace/wrong/non-numeric,
+    never crashes), deterministic generation via seeded Random, operands 10..99,
+    subtraction never negative, same-seed reproducibility
+  - ShakeChallengeTest (pure JVM, 10): threshold detection, cumulative duration
+    tracking (pause-tolerance bridging, interval cap), progress 0..1 + clamp,
+    rebaseline-preserves-progress, reset. REFACTOR TO ENABLE THIS: extracted the
+    per-sample timing/threshold math out of ShakeChallenge into a new pure
+    ShakeAccumulator (injectable clock — the live class fed System.currentTimeMillis
+    so duration couldn't be driven deterministically). ShakeChallenge now delegates;
+    the "no shake / no baseline yet" sentinels became explicit booleans (identical
+    behaviour under epoch-scale time, but robust at any test time base). On-device
+    shake behaviour is unchanged — same arithmetic, same constants
+  - RepositoryTest (Robolectric + in-memory Room, 20): CRUD for all 7 entities
+    (config/event/tag/toggle/quote/routine/exercise incl. FK cascade + single-active
+    routine + goal-mapping resolution) and streak/weekly edge cases: no data, single
+    day today, success-yesterday-still-live, dead streak (>1 day old), consecutive,
+    gap breaks at gap, nuclear-today breaks immediately, duplicate-same-day, longest
+    historical run, weekly counts/rate windows
+  - HomeViewModelTest + SettingsViewModelTest (Robolectric + coroutines-test, 4+5):
+    StateFlow state management/emissions over a real in-memory-Room repo. Harness
+    (ViewModelTestSupport) runs viewModelScope on a real single-thread Main dispatcher,
+    keeps the WhileSubscribed flows hot with a collector, and awaits state on the wall
+    clock (Room emits on its own executor — avoids virtual-clock races). Covers config
+    tracking, create-disabled-default, single-row in-place edits, stats streak/weekly,
+    content toggles, sequence/stage2/active-tag flows, sound/volume/vibration setters.
+    NOTE: firing multiple persist() setters without awaiting between them races (each
+    does read-modify-write on the one row, last write wins); the UI only changes one
+    at a time, so tests sequence the awaits to match
+  - Existing NfcCheckpointManagerTest/ContentScreenManagerTest kept; added an explicit
+    order-randomisation assertion to the NFC test

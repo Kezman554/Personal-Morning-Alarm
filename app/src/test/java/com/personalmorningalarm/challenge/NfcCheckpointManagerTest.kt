@@ -71,6 +71,15 @@ class NfcCheckpointManagerTest {
     }
 
     @Test
+    fun `order is randomised across mornings`() {
+        // Build the morning's full sequence many times; the tap order must not be
+        // identical every time (the shuffle prevents autopilot). With 5 tags the
+        // odds of the same order recurring by chance are negligible.
+        val orders = (1..50).map { sequenceOf(NfcCheckpointManager(tags(5), sequenceLength = 5)) }
+        assertTrue("sequence order never varied — not randomised", orders.toSet().size > 1)
+    }
+
+    @Test
     fun `wrong tag does not advance the sequence`() {
         val manager = NfcCheckpointManager(tags(3), sequenceLength = 3)
         val firstExpected = manager.currentTag!!

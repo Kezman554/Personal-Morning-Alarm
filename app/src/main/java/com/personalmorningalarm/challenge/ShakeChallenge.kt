@@ -32,12 +32,11 @@ class ShakeChallenge(
     private val accelerometer: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
+    // Pure timing/threshold core (unit-tested in isolation).
+    private val accumulator = ShakeAccumulator(targetDurationMs, shakeThreshold)
+
     private var running = false
     private var completed = false
-
-    private var lastSampleTime = 0L
-    private var lastShakeTime = 0L
-    private var accumulatedShakeMs = 0L
 
     override fun start() {
         if (running) return
@@ -48,8 +47,7 @@ class ShakeChallenge(
         }
         // Re-baseline timing only — accumulated progress is preserved across
         // stop/start so a pause (e.g. switching shaking arms) doesn't lose it.
-        lastSampleTime = 0L
-        lastShakeTime = 0L
+        accumulator.rebaseline()
         running = true
         // GAME rate (~50Hz) is plenty for force-based detection and needs no
         // permission. (FASTEST/0us requires HIGH_SAMPLING_RATE_SENSORS on API 31+
@@ -60,9 +58,7 @@ class ShakeChallenge(
     /** Clears accumulated progress so the challenge can run from scratch. */
     fun reset() {
         completed = false
-        lastSampleTime = 0L
-        lastShakeTime = 0L
-        accumulatedShakeMs = 0L
+        accumulator.reset()
     }
 
     override fun stop() {
@@ -81,30 +77,11 @@ class ShakeChallenge(
         // Force measure: how far total acceleration is from gravity. ~0 at rest,
         // large during a shake, independent of sample rate and orientation.
         val linearAccel = abs(magnitude - GRAVITY)
-        val now = System.currentTimeMillis()
 
-        // First sample only establishes the timing baseline.
-        if (lastSampleTime == 0L) {
-            lastSampleTime = now
-            return
-        }
-
-        if (linearAccel > shakeThreshold) {
-            lastShakeTime = now
-        }
-
-        // Count this interval only if a strong shake landed within the tolerance window.
-        val activelyShaking = now - lastShakeTime <= PAUSE_TOLERANCE_MS
-        if (activelyShaking) {
-            val interval = (now - lastSampleTime).coerceAtMost(MAX_INTERVAL_MS)
-            accumulatedShakeMs += interval
-        }
-        lastSampleTime = now
-
-        val progress = (accumulatedShakeMs.toFloat() / targetDurationMs).coerceIn(0f, 1f)
+        val progress = accumulator.onSample(linearAccel, System.currentTimeMillis())
         onProgress?.invoke(progress)
 
-        if (!completed && accumulatedShakeMs >= targetDurationMs) {
+        if (!completed && accumulator.isComplete) {
             completed = true
             stop()
             onComplete?.invoke()
@@ -126,15 +103,6 @@ class ShakeChallenge(
         // throttled out of Doze. 3.5f registers a moderate, comfortable shake.
         const val DEFAULT_SHAKE_THRESHOLD = 3.5f
         const val DEFAULT_TARGET_DURATION_MS = 15_000L
-
-        /**
-         * How long after the last strong shake we still count as "shaking".
-         * Wide enough to bridge the low-motion instant between shake reversals
-         * so continuous shaking accrues smoothly.
-         */
-        private const val PAUSE_TOLERANCE_MS = 500L
-
-        /** Caps a single interval so a stalled sensor can't jump the timer. */
-        private const val MAX_INTERVAL_MS = 100L
+        // Pause tolerance + interval cap now live in ShakeAccumulator.
     }
 }
