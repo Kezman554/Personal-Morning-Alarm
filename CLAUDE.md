@@ -19,6 +19,14 @@ Commands
 ./gradlew test - Run unit tests
 ./gradlew connectedAndroidTest - Run instrumented tests
 
+Build prerequisite: gradle needs JAVA_HOME pointing at a JDK 17+ (this dev box has
+no java on PATH by default). Android Studio's bundled JBR works:
+JAVA_HOME=C:\Program Files\Android\Android Studio\jbr (OpenJDK 21). A persistent
+user-level JAVA_HOME is set on this machine; if a fresh shell can't find java, set
+it for the session before running gradle. Unit tests use Robolectric (pinned to
+sdk=33 in app/src/test/resources/robolectric.properties) so Room/framework-backed
+tests run on the local JVM.
+
 Git
 
 Do not push to GitHub without explicit permission

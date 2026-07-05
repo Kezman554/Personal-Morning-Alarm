@@ -786,3 +786,19 @@
     at a time, so tests sequence the awaits to match
   - Existing NfcCheckpointManagerTest/ContentScreenManagerTest kept; added an explicit
     order-randomisation assertion to the NFC test
+
+2026-07-05  Dev-env fix: JAVA_HOME for command-line gradle
+  - SYMPTOM: `./gradlew test` failed with "JAVA_HOME is not set and no 'java' command
+    could be found in your PATH". Confirmed JAVA_HOME was unset at BOTH User and Machine
+    level and java was not on PATH — nothing on the box pointed tooling at a JDK, so
+    gradle from any terminal couldn't start. (Same root cause as the recurring VS Code
+    "download a JDK" popup from the Red Hat Java extension: it couldn't find a JDK either.)
+  - A JDK was already present: Android Studio's bundled JBR = OpenJDK 21 at
+    C:\Program Files\Android\Android Studio\jbr. No new JDK needed (the popup's download
+    would have been a redundant second copy and wouldn't set the OS JAVA_HOME gradle reads)
+  - FIX: set a persistent USER-level JAVA_HOME to that JBR and appended its \bin to the
+    user PATH (literal path — user env vars written via .NET are REG_SZ so %JAVA_HOME%
+    wouldn't expand). Takes effect in newly-started processes; existing shells / the
+    gradle daemon / an open VS Code need a restart to inherit it. Should also stop the
+    Red Hat extension's JDK-download prompt once VS Code is restarted
+  - Documented the JAVA_HOME build prerequisite in CLAUDE.md (Commands section)
