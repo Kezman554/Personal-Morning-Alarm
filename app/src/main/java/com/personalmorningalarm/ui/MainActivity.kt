@@ -2,6 +2,7 @@ package com.personalmorningalarm.ui
 
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
@@ -11,12 +12,24 @@ import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.databinding.ActivityMainBinding
 import com.personalmorningalarm.util.AlarmScheduler
 import com.personalmorningalarm.util.BatteryOptimisationHelper
+import com.personalmorningalarm.util.NotificationPermissionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+
+    /** Guards against stacking a second dialog when onStart runs again. */
+    private var notificationDialogShown = false
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            Log.d(TAG, "POST_NOTIFICATIONS granted=$granted")
+            // Denied means the alarm can sound with no way to dismiss it, so say so
+            // now rather than letting it surface at 6am.
+            if (!granted) showNotificationsBlockedDialog()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +49,36 @@ class MainActivity : AppCompatActivity() {
             BatteryOptimisationHelper.markPrompted(this)
             BatteryOptimisationHelper.showExplanationDialog(this)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Re-checked on every launch, not once: the grant can vanish under the app
+        // (a reinstall resets it, and the user can revoke it in system settings),
+        // and the failure is silent — the alarm sounds with no dismissal screen.
+        ensureNotificationsEnabled()
+    }
+
+    private fun ensureNotificationsEnabled() {
+        if (NotificationPermissionHelper.areNotificationsEnabled(this)) {
+            notificationDialogShown = false
+            return
+        }
+        if (NotificationPermissionHelper.shouldRequestPermission(this)) {
+            NotificationPermissionHelper.markRequested(this)
+            notificationPermissionLauncher.launch(NotificationPermissionHelper.PERMISSION)
+        } else {
+            // Already asked (or notifications were turned off in settings, where the
+            // system dialog would silently no-op) — send them to settings instead.
+            showNotificationsBlockedDialog()
+        }
+    }
+
+    private fun showNotificationsBlockedDialog() {
+        if (notificationDialogShown) return
+        notificationDialogShown = true
+        Log.w(TAG, "Notifications disabled — the alarm cannot show its dismissal screen")
+        NotificationPermissionHelper.showBlockedDialog(this)
     }
 
     /**

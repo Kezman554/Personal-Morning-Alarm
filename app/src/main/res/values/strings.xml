@@ -128,6 +128,16 @@
     <string name="theme_dark">Dark</string>
     <string name="theme_system">Follow system</string>
 
+    <!-- Notifications (the alarm's dismissal screen depends on them) -->
+    <string name="notifications_section_title">Notifications</string>
+    <string name="notifications_status_blocked">Blocked — the alarm will sound with no way to turn it off.</string>
+    <string name="notifications_status_enabled">Enabled — the alarm can show its dismissal screen.</string>
+    <string name="notifications_button">Fix notification access</string>
+    <string name="notifications_dialog_title">Notifications are blocked</string>
+    <string name="notifications_dialog_message">MorningSync needs notifications to show the screen that turns the alarm off. Without them the alarm still sounds at full volume, but nothing appears to dismiss it.\n\nTurn notifications on to fix this.</string>
+    <string name="notifications_open_settings">Open settings</string>
+    <string name="notifications_not_now">Not now</string>
+
     <!-- Battery optimisation -->
     <string name="battery_section_title">Battery</string>
     <string name="battery_status_optimised">Battery optimisation is on — alarms may be delayed or missed.</string>
