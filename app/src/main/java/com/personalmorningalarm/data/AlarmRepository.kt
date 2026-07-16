@@ -57,12 +57,16 @@ class AlarmRepository(private val db: AppDatabase) {
     suspend fun saveContentToggle(toggle: ContentToggle): Long = contentToggleDao.insert(toggle)
     suspend fun saveContentToggles(toggles: List<ContentToggle>) = contentToggleDao.insertAll(toggles)
     suspend fun updateContentToggle(toggle: ContentToggle) = contentToggleDao.update(toggle)
-    suspend fun getAllContentToggles(): List<ContentToggle> = contentToggleDao.getAll()
+    // Reads pass the types this build knows, so a toggle row written by a newer
+    // build is skipped rather than crashing the read. See ContentToggleDao.
+    suspend fun getAllContentToggles(): List<ContentToggle> =
+        contentToggleDao.getAll(ContentType.knownNames)
     suspend fun getEnabledContentToggles(): List<ContentToggle> =
-        contentToggleDao.getEnabledContentToggles()
+        contentToggleDao.getEnabledContentToggles(ContentType.knownNames)
     suspend fun getContentToggle(type: ContentType): ContentToggle? =
         contentToggleDao.getByType(type)
-    fun observeContentToggles(): Flow<List<ContentToggle>> = contentToggleDao.observeAll()
+    fun observeContentToggles(): Flow<List<ContentToggle>> =
+        contentToggleDao.observeAll(ContentType.knownNames)
 
     // --- Bundled quotes ---
     suspend fun addQuote(quote: BundledQuote): Long = bundledQuoteDao.insert(quote)
