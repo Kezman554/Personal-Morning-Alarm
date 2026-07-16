@@ -21,9 +21,12 @@ import com.personalmorningalarm.data.entity.AlarmConfig
 import com.personalmorningalarm.data.model.AlarmSound
 import com.personalmorningalarm.data.model.AlarmSounds
 import com.personalmorningalarm.data.model.ContentType
+import com.personalmorningalarm.data.remote.AlfredSettings
+import com.personalmorningalarm.databinding.DialogAlfredHostBinding
 import com.personalmorningalarm.databinding.DialogDurationSliderBinding
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
 import com.personalmorningalarm.util.BatteryOptimisationHelper
+import com.personalmorningalarm.util.NotificationPermissionHelper
 import com.personalmorningalarm.util.PinManager
 import com.personalmorningalarm.util.SoundPreviewPlayer
 import com.personalmorningalarm.util.ThemeManager
@@ -42,6 +45,7 @@ class SettingsFragment : Fragment() {
 
     private lateinit var pinManager: PinManager
     private lateinit var themeManager: ThemeManager
+    private lateinit var alfredSettings: AlfredSettings
     private val preview = SoundPreviewPlayer()
 
     /** Cached so the Stage 2 picker dialog opens on the current saved value. */
@@ -65,6 +69,7 @@ class SettingsFragment : Fragment() {
 
         pinManager = PinManager(requireContext())
         themeManager = ThemeManager(requireContext())
+        alfredSettings = AlfredSettings(requireContext())
 
         // Theme: per-button onClick (not the group listener) so setting the initial
         // checked state below doesn't loop. Changing it recreates the activity, so the
@@ -82,6 +87,10 @@ class SettingsFragment : Fragment() {
 
         binding.btnBattery.setOnClickListener {
             BatteryOptimisationHelper.showExplanationDialog(requireContext())
+        }
+
+        binding.btnNotifications.setOnClickListener {
+            NotificationPermissionHelper.openNotificationSettings(requireContext())
         }
 
         binding.btnManageTags.setOnClickListener {
@@ -173,6 +182,15 @@ class SettingsFragment : Fragment() {
         binding.switchPlaceholder.setOnClickListener {
             viewModel.setContentEnabled(ContentType.PLACEHOLDER, binding.switchPlaceholder.isChecked)
         }
+        binding.switchDailySchedule.setOnClickListener {
+            viewModel.setContentEnabled(
+                ContentType.DAILY_SCHEDULE,
+                binding.switchDailySchedule.isChecked
+            )
+        }
+
+        binding.rowAlfredHost.setOnClickListener { showAlfredHostDialog() }
+        renderAlfredHost()
 
         // onClick (not the group's checked-change) so programmatic updates don't loop.
         binding.rbStretch5.setOnClickListener { viewModel.setStretchDuration(5) }
@@ -220,6 +238,8 @@ class SettingsFragment : Fragment() {
                                 )
                             }
                             ContentType.PLACEHOLDER -> binding.switchPlaceholder.isChecked = t.isEnabled
+                            ContentType.DAILY_SCHEDULE ->
+                                binding.switchDailySchedule.isChecked = t.isEnabled
                         }
                     }
                 }
@@ -308,6 +328,44 @@ class SettingsFragment : Fragment() {
             .show()
     }
 
+    /** Shows the saved Alfred address (or the default, which is what we'd use). */
+    private fun renderAlfredHost() {
+        binding.tvAlfredHost.text = alfredSettings.getHost()
+    }
+
+    /**
+     * Text dialog for the Alfred address. Saves through [AlfredSettings.setHost],
+     * which normalises what was typed, then shows back what we actually stored.
+     *
+     * Save is wired after show() so an unusable address can report itself inline
+     * and keep the dialog open — the default listener would dismiss regardless,
+     * and a typo here otherwise wouldn't surface until the alarm goes off.
+     */
+    private fun showAlfredHostDialog() {
+        val dialogBinding = DialogAlfredHostBinding.inflate(layoutInflater)
+        dialogBinding.etAlfredHost.setText(alfredSettings.getHost())
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.alfred_host_dialog_title)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val typed = dialogBinding.etAlfredHost.text?.toString().orEmpty()
+                if (!AlfredSettings.isValid(typed)) {
+                    dialogBinding.tilAlfredHost.error = getString(R.string.alfred_host_invalid)
+                    return@setOnClickListener
+                }
+                alfredSettings.setHost(typed)
+                renderAlfredHost()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
     /** Slider dialog (5–15 min) for the Stage 2 time limit. */
     private fun showStage2DurationDialog() {
         val dialogBinding = DialogDurationSliderBinding.inflate(layoutInflater)
@@ -345,6 +403,17 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         renderBatteryStatus()
+        renderNotificationStatus()
+    }
+
+    /** Reflects whether notifications can actually be delivered (refreshed on return). */
+    private fun renderNotificationStatus() {
+        val enabled = NotificationPermissionHelper.areNotificationsEnabled(requireContext())
+        binding.tvNotificationsStatus.text = getString(
+            if (enabled) R.string.notifications_status_enabled
+            else R.string.notifications_status_blocked
+        )
+        binding.btnNotifications.isEnabled = !enabled
     }
 
     /** Reflects the current battery-optimisation state (refreshed on return). */

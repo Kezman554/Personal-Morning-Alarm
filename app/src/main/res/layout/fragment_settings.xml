@@ -44,6 +44,29 @@
                 android:text="@string/theme_system" />
         </RadioGroup>
 
+        <!-- Notifications — the alarm's dismissal screen rides on them -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/notifications_section_title"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+        <TextView
+            android:id="@+id/tv_notifications_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            tools:text="Blocked — the alarm will sound with no way to turn it off." />
+
+        <Button
+            android:id="@+id/btn_notifications"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/notifications_button" />
+
         <!-- Battery optimisation -->
         <TextView
             android:layout_width="wrap_content"
@@ -170,6 +193,13 @@
             android:layout_marginTop="8dp"
             android:text="@string/toggle_placeholder" />
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_daily_schedule"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/toggle_daily_schedule" />
+
         <Button
             android:id="@+id/btn_manage_quotes"
             style="?attr/materialButtonOutlinedStyle"
@@ -185,6 +215,47 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/manage_routines" />
+
+        <!-- Alfred Vault API — shared by every Alfred-backed content screen -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/alfred_section_title"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+        <LinearLayout
+            android:id="@+id/row_alfred_host"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:paddingVertical="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/alfred_host_label"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <TextView
+                android:id="@+id/tv_alfred_host"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                tools:text="192.168.1.100:8200" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/alfred_host_help"
+            android:textAppearance="?attr/textAppearanceBodySmall" />
 
         <!-- Alarm sounds & volume -->
         <TextView

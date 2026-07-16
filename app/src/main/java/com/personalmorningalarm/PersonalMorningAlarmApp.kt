@@ -30,21 +30,26 @@ class PersonalMorningAlarmApp : Application() {
                 repository.addQuotes(QuoteSeedData.quotes)
                 Log.d(TAG, "Seeded ${QuoteSeedData.quotes.size} bundled quotes")
             }
-            if (repository.getAllContentToggles().isEmpty()) {
-                repository.saveContentToggles(
-                    listOf(
-                        ContentToggle(contentType = ContentType.QUOTE, isEnabled = true, displayOrder = 0),
-                        ContentToggle(contentType = ContentType.STRETCH, isEnabled = true, displayOrder = 1),
-                        ContentToggle(contentType = ContentType.PLACEHOLDER, isEnabled = false, displayOrder = 2)
-                    )
-                )
-                Log.d(TAG, "Seeded default content toggles")
-            }
+            seedMissingContentToggles(repository)
             if (repository.getRoutineCount() == 0) {
                 seedStretchRoutines(repository)
                 Log.d(TAG, "Seeded ${StretchSeedData.routines.size} stretch routines")
             }
         }
+    }
+
+    /**
+     * Inserts a toggle row for any content type that hasn't got one, rather than
+     * seeding only into an empty table — that way a content type added in a later
+     * version reaches existing installs too, instead of having no row for settings
+     * to switch on. Types already present keep the user's saved state.
+     */
+    private suspend fun seedMissingContentToggles(repository: AlarmRepository) {
+        val existing = repository.getAllContentToggles().map { it.contentType }.toSet()
+        val missing = DEFAULT_CONTENT_TOGGLES.filterNot { it.contentType in existing }
+        if (missing.isEmpty()) return
+        repository.saveContentToggles(missing)
+        Log.d(TAG, "Seeded content toggles: ${missing.map { it.contentType }}")
     }
 
     /**
@@ -76,5 +81,16 @@ class PersonalMorningAlarmApp : Application() {
 
     companion object {
         private const val TAG = "PMA"
+
+        /**
+         * Default state for every content screen. Daily Schedule is off by default:
+         * it needs an Alfred address configured before it can show anything.
+         */
+        private val DEFAULT_CONTENT_TOGGLES = listOf(
+            ContentToggle(contentType = ContentType.QUOTE, isEnabled = true, displayOrder = 0),
+            ContentToggle(contentType = ContentType.STRETCH, isEnabled = true, displayOrder = 1),
+            ContentToggle(contentType = ContentType.PLACEHOLDER, isEnabled = false, displayOrder = 2),
+            ContentToggle(contentType = ContentType.DAILY_SCHEDULE, isEnabled = false, displayOrder = 3)
+        )
     }
 }

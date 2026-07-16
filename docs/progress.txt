@@ -802,3 +802,83 @@
     gradle daemon / an open VS Code need a restart to inherit it. Should also stop the
     Red Hat extension's JDK-download prompt once VS Code is restarted
   - Documented the JAVA_HOME build prerequisite in CLAUDE.md (Commands section)
+
+2026-07-16  Card AE: Daily Schedule content screen + shared Alfred plumbing
+  - Alfred infrastructure built to be reused, not schedule-specific — Card AF
+    (Rolling To-Do) should add GET /chalkboard to AlfredApiService and one thin
+    method on AlfredRepository, and get caching/fallback for free:
+      * AlfredApiService — Retrofit interface, one method per endpoint
+      * AlfredClient — builds the service from the saved address, rebuilds only
+        when it changes; 3s timeouts (Alfred is on the LAN: it answers fast or
+        it isn't there, and a content screen must never hang mid-morning)
+      * AlfredRepository.fetch — generic: caches every success, serves the cached
+        response when Alfred is unreachable, returns Unavailable only if there's
+        nothing cached. Never throws; Alfred being down is an ordinary morning
+      * AlfredResult = Fresh / Stale(cachedAt) / Unavailable — the three cases
+        every Alfred screen renders
+      * AlfredResponseCache — last successful body per endpoint (SharedPreferences).
+        An unparseable cache is discarded, not retried forever
+  - Settings: "Alfred host address" (host:port, default 192.168.1.100:8200) in a
+    new Alfred section, deliberately NOT nested under the schedule toggle since AF
+    shares it. Input is normalised (strips pasted scheme/path, adds default port)
+    and validated — a typo would otherwise only surface at 6am
+  - Screen: GET /daily-schedule, grouped Morning/Afternoon/Evening/Anytime, API
+    order preserved within a group, markdown in `task` rendered (MarkdownRenderer,
+    **bold**/*italic*). Read-only: no completion state, no timestamps. 15s dismiss
+    lock reused from the Card AA pattern
+  - The lock starts when the screen shows, NOT when Alfred answers — a slow or
+    absent Alfred must not lengthen the morning or block the NFC sequence
+  - Schedule renders into its own scrollable view, not the shared centred
+    content_body: real tasks are long, and the panel had no scroll (added
+    layout_constrainedHeight so a long schedule can't push past the Stop button)
+  - Toggle seeding now inserts any MISSING content type rather than only seeding an
+    empty table — otherwise DAILY_SCHEDULE would never reach this install (which
+    already has toggle rows) and the settings switch would silently do nothing.
+    Default off: it needs an Alfred address first. No DB migration needed (enum
+    stored as TEXT)
+  - VERIFIED on the A32 against the live Alfred: real schedule fetched, parsed and
+    grouped am/pm correctly; unreachable host fell back to the cached response
+    (Stale) and to Unavailable with no cache. Done via a temporary instrumented
+    test, since the content screen itself needs physical NFC taps to reach — the
+    on-phone Stage 2 run is still untested and is Nick's to do
+  - 82 unit tests passing
+
+2026-07-16  INCIDENT: test alarm sounded with no way to turn it off
+  - SYMPTOM: test alarm fired, sounded correctly, but no dismissal screen ever
+    appeared. No crash in logcat — nothing to point at. (The 15s countdowns and
+    nuclear fires in the log around 21:04 were the HomeFragment dev-tools test
+    button, working as intended — a red herring.)
+  - ROOT CAUSE: notifications were blocked (importance=NONE, POST_NOTIFICATION:
+    ignore). AlarmService's notification full-screen intent is the ONLY path that
+    puts the dismissal screen up, so with notifications off the alarm sounds at
+    full volume and nothing can display the screen that stops it. The app declared
+    POST_NOTIFICATIONS in the manifest but never requested it, so it could not
+    recover on its own — and on API 33+ it's denied by default
+  - WHY IT SURFACED NOW: the app was freshly installed at 18:32 by this session's
+    gradle install/connectedAndroidTest run — proven by the uid changing 10467 ->
+    10471 and firstInstallTime resetting. A fresh install resets runtime
+    permissions. The bug was latent from the start; the reinstall exposed it.
+    Any new phone or reinstall reproduces it
+  - IMMEDIATE: force-stopped the app to kill the sound, re-granted the permission
+    via adb. NOTE force-stop also cancels the app's pending AlarmManager alarms —
+    relaunching the app re-armed 06:00 (verified pending in dumpsys alarm). The
+    launch-time re-arm in MainActivity is what saves this
+  - FIX (own commit, branch fix/notification-permission off main): MainActivity
+    requests POST_NOTIFICATIONS and re-checks on every onStart (the grant can
+    vanish under the app); if it can't be requested — denied twice, or turned off
+    in settings, where the system dialog silently no-ops — the app explains the
+    consequence and routes to notification settings. Settings gained a status row
+    mirroring the battery one. The check reads areNotificationsEnabled() rather
+    than the permission grant alone, since the grant can read as granted while
+    delivery is still blocked
+  - VERIFIED on the A32, all three paths: blocked+never-asked -> system dialog ->
+    Allow -> granted=true, importance NONE -> DEFAULT; blocked+already-asked ->
+    the app's own warning -> settings; enabled -> silent, no nagging
+  - DIAGNOSIS RECIPE for next time: `dumpsys notification | grep -A3 <pkg>` —
+    importance=NONE is the tell; `cmd appops get <pkg> POST_NOTIFICATION`
+  - KNOWN ISSUE (not fixed, noticed while testing): Converters.toContentType uses
+    ContentType.valueOf, which throws IllegalArgumentException on an unknown name
+    and hard-crashes the app at launch. Hit it by installing a build without
+    DAILY_SCHEDULE over a DB that had the row (branch switching). Only a downgrade
+    or a removed/renamed ContentType triggers it, but the failure is a launch
+    crash — worth a defensive fallback if content types ever churn
