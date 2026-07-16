@@ -804,165 +804,59 @@
   - Documented the JAVA_HOME build prerequisite in CLAUDE.md (Commands section)
 
 2026-07-16  Card AE: Daily Schedule content screen + shared Alfred plumbing
-  - Alfred infrastructure built to be reused, not schedule-specific — Card AF
-    (Rolling To-Do) should add GET /chalkboard to AlfredApiService and one thin
-    method on AlfredRepository, and get caching/fallback for free:
-      * AlfredApiService — Retrofit interface, one method per endpoint
-      * AlfredClient — builds the service from the saved address, rebuilds only
-        when it changes; 3s timeouts (Alfred is on the LAN: it answers fast or
-        it isn't there, and a content screen must never hang mid-morning)
-      * AlfredRepository.fetch — generic: caches every success, serves the cached
-        response when Alfred is unreachable, returns Unavailable only if there's
-        nothing cached. Never throws; Alfred being down is an ordinary morning
-      * AlfredResult = Fresh / Stale(cachedAt) / Unavailable — the three cases
-        every Alfred screen renders
-      * AlfredResponseCache — last successful body per endpoint (SharedPreferences).
-        An unparseable cache is discarded, not retried forever
-  - Settings: "Alfred host address" (host:port, default 192.168.1.100:8200) in a
-    new Alfred section, deliberately NOT nested under the schedule toggle since AF
-    shares it. Input is normalised (strips pasted scheme/path, adds default port)
-    and validated — a typo would otherwise only surface at 6am
-  - Screen: GET /daily-schedule, grouped Morning/Afternoon/Evening/Anytime, API
-    order preserved within a group, markdown in `task` rendered (MarkdownRenderer,
-    **bold**/*italic*). Read-only: no completion state, no timestamps. 15s dismiss
-    lock reused from the Card AA pattern
-  - The lock starts when the screen shows, NOT when Alfred answers — a slow or
-    absent Alfred must not lengthen the morning or block the NFC sequence
-  - Schedule renders into its own scrollable view, not the shared centred
-    content_body: real tasks are long, and the panel had no scroll (added
-    layout_constrainedHeight so a long schedule can't push past the Stop button)
-  - Toggle seeding now inserts any MISSING content type rather than only seeding an
-    empty table — otherwise DAILY_SCHEDULE would never reach this install (which
-    already has toggle rows) and the settings switch would silently do nothing.
-    Default off: it needs an Alfred address first. No DB migration needed (enum
-    stored as TEXT)
-  - VERIFIED on the A32 against the live Alfred: real schedule fetched, parsed and
-    grouped am/pm correctly; unreachable host fell back to the cached response
-    (Stale) and to Unavailable with no cache. Done via a temporary instrumented
-    test, since the content screen itself needs physical NFC taps to reach — the
-    on-phone Stage 2 run is still untested and is Nick's to do
-  - 82 unit tests passing
+  - GET /daily-schedule, grouped Morning/Afternoon/Evening/Anytime, API order kept
+    within a group, markdown in `task` rendered (no literal asterisks). Read-only.
+    15s dismiss lock (Card AA pattern) starts when the screen SHOWS, not when Alfred
+    answers, so a slow/absent Alfred can't lengthen the morning
+  - Alfred plumbing is generic on purpose: Card AF adds @GET("chalkboard") plus one
+    thin AlfredRepository method and inherits caching, unreachable-fallback and the
+    host setting. fetch() caches every success, serves cache when unreachable,
+    Unavailable only if nothing cached; it never throws — Alfred being down is an
+    ordinary morning. Host (default 192.168.1.100:8200) sits in its own settings
+    section, not under the schedule toggle, so AF shares it
+  - Toggle seeding now inserts MISSING content types rather than only seeding an empty
+    table — otherwise DAILY_SCHEDULE never reaches an install that already has rows and
+    the switch silently does nothing. Seeds OFF and last, so it needs enabling + a gap
+    to land in. No migration (enum stored as TEXT)
+  - Schedule renders into its own scrollable view: real Alfred tasks are long and the
+    shared centred content_body had no scroll
+  - Confirmed on the A32 through a real Stage 2 run. Merged to main with the two fixes
+    below; 92 unit tests passing
+  - Still open: DEFAULT_HOST hardcodes 192.168.1.100:8200 in a public repo — the card
+    specified it and it's non-routable RFC1918, but CLAUDE.md forbids private network
+    details. Blank default if that matters
 
-2026-07-16  INCIDENT: test alarm sounded with no way to turn it off
-  - SYMPTOM: test alarm fired, sounded correctly, but no dismissal screen ever
-    appeared. No crash in logcat — nothing to point at. (The 15s countdowns and
-    nuclear fires in the log around 21:04 were the HomeFragment dev-tools test
-    button, working as intended — a red herring.)
-  - ROOT CAUSE: notifications were blocked (importance=NONE, POST_NOTIFICATION:
-    ignore). AlarmService's notification full-screen intent is the ONLY path that
-    puts the dismissal screen up, so with notifications off the alarm sounds at
-    full volume and nothing can display the screen that stops it. The app declared
-    POST_NOTIFICATIONS in the manifest but never requested it, so it could not
-    recover on its own — and on API 33+ it's denied by default
-  - WHY IT SURFACED NOW: the app was freshly installed at 18:32 by this session's
-    gradle install/connectedAndroidTest run — proven by the uid changing 10467 ->
-    10471 and firstInstallTime resetting. A fresh install resets runtime
-    permissions. The bug was latent from the start; the reinstall exposed it.
-    Any new phone or reinstall reproduces it
-  - IMMEDIATE: force-stopped the app to kill the sound, re-granted the permission
-    via adb. NOTE force-stop also cancels the app's pending AlarmManager alarms —
-    relaunching the app re-armed 06:00 (verified pending in dumpsys alarm). The
-    launch-time re-arm in MainActivity is what saves this
-  - FIX (own commit, branch fix/notification-permission off main): MainActivity
-    requests POST_NOTIFICATIONS and re-checks on every onStart (the grant can
-    vanish under the app); if it can't be requested — denied twice, or turned off
-    in settings, where the system dialog silently no-ops — the app explains the
-    consequence and routes to notification settings. Settings gained a status row
-    mirroring the battery one. The check reads areNotificationsEnabled() rather
-    than the permission grant alone, since the grant can read as granted while
-    delivery is still blocked
-  - VERIFIED on the A32, all three paths: blocked+never-asked -> system dialog ->
-    Allow -> granted=true, importance NONE -> DEFAULT; blocked+already-asked ->
-    the app's own warning -> settings; enabled -> silent, no nagging
-  - DIAGNOSIS RECIPE for next time: `dumpsys notification | grep -A3 <pkg>` —
-    importance=NONE is the tell; `cmd appops get <pkg> POST_NOTIFICATION`
-  - KNOWN ISSUE (FIXED same day — see the next entry): Converters.toContentType uses
-    ContentType.valueOf, which throws IllegalArgumentException on an unknown name
-    and hard-crashes the app at launch. Hit it by installing a build without
-    DAILY_SCHEDULE over a DB that had the row (branch switching). Only a downgrade
-    or a removed/renamed ContentType triggers it, but the failure is a launch
-    crash — worth a defensive fallback if content types ever churn
-
-2026-07-16  Enum-name launch crash fixed (the known issue logged above)
-  - Both enums are stored by name, so a name this build doesn't have reaches the
-    Room converters, where valueOf threw and killed the app at launch. Reproduced
-    for real: installing a build without DAILY_SCHEDULE over a DB holding the row
-    gave "No enum constant ContentType.DAILY_SCHEDULE" on startup. A downgrade
-    triggers it today; renaming or removing any stored enum value would trigger it
-    for every install
-  - Each converter now degrades in whichever direction loses least:
-      * Content toggles: filtered in SQL on ContentType.knownNames, so an unknown
-        row is never read — and never rewritten, so a newer build's data survives a
-        downgrade intact. toContentType stays STRICT on purpose: guessing a
-        stand-in would show the wrong screen and writing the guess back would
-        destroy the original name. Reaching the throw now means a query forgot the
-        filter — and Room rejects an unused query param, so the filter can't be
-        dropped silently (confirmed by trying it)
-      * MorningGoal: falls back to the default instead, because it rides on the
-        alarm config — refusing that row would take the alarm with it, and a wrong
-        goal label beats an alarm that never fires
-  - VERIFIED against the exact crashing state on the A32: app launches clean over a
-    DB holding a DAILY_SCHEDULE row, and the unknown row is left intact. The new
-    tests were checked against the pre-fix code and DO fail there — a test that
-    passes before and after proves nothing
-  - Note for future device debugging: `strings` doesn't exist in this Git Bash, so
-    `strings file | grep x` silently returns nothing and reads as "not found".
-    Use `grep -a` on the raw bytes, and `adb exec-out` (not `adb shell`) for binary
-    pulls — `adb shell` mangles them
-
-2026-07-16  Session close: Card AE + both fixes merged to main
-  - Daily Schedule CONFIRMED WORKING on the A32 through a real Stage 2 run
-  - Merged to main: Card AE (Daily Schedule + reusable Alfred plumbing),
-    fix/notification-permission, fix/unknown-content-type. 92 unit tests passing
-  - Card AF (Rolling To-Do) picks up the Alfred client as-is: add
-    @GET("chalkboard") to AlfredApiService plus one thin AlfredRepository method,
-    and caching / unreachable-fallback / the host setting all come for free. The
-    host lives in its own Alfred settings section, not under the schedule toggle,
-    precisely so AF shares it
-  - Still open from Card AE review: DEFAULT_HOST hardcodes 192.168.1.100:8200 in a
-    public repo. The card specified that default and it's a non-routable RFC1918
-    address, but CLAUDE.md says never commit private network details — swap it for
-    a blank default if that matters
-  - Watch on the next real morning: the schedule renders into its own scrollable
-    view because real Alfred tasks are long; the panel is height-constrained so it
-    can't push past the Stop button. Daily Schedule seeds OFF and last in display
-    order, so it only appears once enabled and given a gap to land in
-
-2026-07-16  INCIDENT: instrumented test run wiped real device data
-  - LOST: two/three NFC tags registered 15 Jul (Basildon Park Photo, Fish Bowl,
-    possibly a third) and alarm_events from 14 Jun to 15 Jul (~a month of streak
-    history). Not recoverable — see below
-  - CAUSE: `./gradlew connectedDebugAndroidTest` at 18:25:24, run to verify the
-    Alfred connection on the A32. AGP uninstalls the app + test APKs when the run
-    finishes, and uninstalling WIPES the app's data directory. The 18:32
-    installDebug then reinstalled, and android:allowBackup="true" made Android
-    silently restore the last cloud backup — which was ~5 weeks stale (13 Jun)
-  - WHY IT LOOKED IMPOSSIBLE: the restore brought back the three older tags but
-    not the newer ones, so it read as "someone deleted only the new tags" rather
-    than "the database was replaced by an old copy". A wipe that restores looks
-    like selective deletion. Same reinstall also reset POST_NOTIFICATIONS, which
-    is what produced the unstoppable alarm earlier in the session — one cause,
-    two symptoms, and the connection was missed at the time
-  - PROOF (reusable forensics): sqlite_sequence holds the highest AUTOINCREMENT id
-    ever issued per table and survives row deletion but not a wipe/restore.
-    nfc_tags read 5 while the missing tags would have been ids 6+ — so they had
-    NEVER existed in that database; it was an old copy, not a deletion. Corroborated
-    by: alarm_events jumping 2026-06-13 -> 2026-07-16 despite dumpsys alarm showing
-    fires on 07-01..07-06; databases/ dir created 18:32; the .db file carrying a
-    1970-01-21 mtime (restored-file signature); com.personalmorningalarm.test
-    installed 18:25:24 and gone with nobody uninstalling it; uid 10467 -> 10471
-  - NOT RECOVERABLE: a fresh backup ran at 21:59:59 the same evening and overwrote
-    the cloud copy with the restored stale data, so there is nothing older to go
-    back to. Physical tags must be re-registered by hand
-  - PREVENTION: gradle.properties now sets
-    android.injected.androidTest.leaveApksInstalledAfterRun=true (verified present
-    in AGP 8.7.3's BooleanOption enum, Stage.Stable, default false — so the default
-    really was uninstall-after-run). NOT empirically tested: proving it would mean
-    running connectedAndroidTest on the A32, which is exactly what must never
-    happen again, and no AVD is configured
-  - THE RULE: never run connectedAndroidTest on the A32. The flag only removes the
-    uninstall — an instrumented test still executes inside the app's own data dir
-    and can overwrite its database and prefs (the Alfred test wrote to the real
-    SharedPreferences). Verify on-device with installDebug + adb (an update install
-    preserves data); keep logic in the Robolectric unit tests; use an emulator or a
-    spare device if an instrumented test is genuinely required
+2026-07-16  INCIDENT: connectedAndroidTest wiped real device data (+ 2 fixes it exposed)
+  - LOST, unrecoverably: 2-3 NFC tags added 15 Jul (Basildon Park Photo, Fish Bowl) and
+    alarm_events 14 Jun - 15 Jul. Re-register the physical tags by hand
+  - CAUSE: connectedDebugAndroidTest at 18:25 to verify Alfred on the A32. AGP
+    uninstalls both APKs when the run ends; uninstalling WIPES the data dir. The next
+    installDebug reinstalled and allowBackup="true" silently restored a 5-week-stale
+    cloud backup (13 Jun) — which returned the 3 OLDER tags but not the newer ones, so
+    it read as "only the new tags deleted" instead of "database replaced". A wipe that
+    restores looks like selective deletion
+  - THE RULE: never run connectedAndroidTest on the A32. gradle.properties now sets
+    android.injected.androidTest.leaveApksInstalledAfterRun=true (verified in AGP 8.7.3
+    BooleanOption, Stage.Stable, default false; not empirically tested — proving it means
+    running the banned command, and no AVD exists). The flag only stops the uninstall —
+    instrumented tests still run inside the app's data dir. Verify with installDebug +
+    adb (update installs preserve data); keep logic in the Robolectric unit tests
+  - SAME REINSTALL, 2nd symptom: it reset POST_NOTIFICATIONS. The dismissal screen only
+    appears via AlarmService's notification full-screen intent, so the alarm sounded with
+    no way to stop it and NO crash to point at. The app declared the permission but never
+    requested it. MainActivity now requests it, re-checks every onStart (the grant can
+    vanish), and routes to settings if it can't ask; checks areNotificationsEnabled(),
+    not the grant alone (grant can read granted while delivery is blocked).
+    Diagnose: `dumpsys notification | grep -A3 <pkg>` — importance=NONE is the tell
+  - ALSO FOUND: Converters used valueOf, so an enum name this build lacks crashed the app
+    at LAUNCH. Content toggles now filtered in SQL on ContentType.knownNames (unknown rows
+    never read or rewritten, so newer data survives a downgrade); toContentType stays
+    strict — no sensible stand-in, and writing a guess back destroys the name. Unknown
+    MorningGoal falls back to default instead: it rides on the alarm config, and refusing
+    that row would take the alarm with it
+  - FORENSICS WORTH KEEPING: sqlite_sequence holds the highest AUTOINCREMENT id ever
+    issued per table — survives deletion, not a wipe/restore. nfc_tags read 5 while the
+    missing tags would be 6+, proving they were never in that DB. Pull with
+    `adb exec-out run-as <pkg> cat databases/<db>` (+ -wal; `adb shell` mangles binary).
+    `strings` does not exist in this Git Bash — `strings | grep` silently reads as
+    "not found"; use `grep -a`
