@@ -4,5 +4,8 @@ package com.personalmorningalarm.data.model
 enum class ContentType {
     QUOTE,
     STRETCH,
-    PLACEHOLDER
+    PLACEHOLDER,
+
+    /** Today's schedule, read from the Alfred Vault API. */
+    DAILY_SCHEDULE
 }

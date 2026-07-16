@@ -802,3 +802,43 @@
     gradle daemon / an open VS Code need a restart to inherit it. Should also stop the
     Red Hat extension's JDK-download prompt once VS Code is restarted
   - Documented the JAVA_HOME build prerequisite in CLAUDE.md (Commands section)
+
+2026-07-16  Card AE: Daily Schedule content screen + shared Alfred plumbing
+  - Alfred infrastructure built to be reused, not schedule-specific — Card AF
+    (Rolling To-Do) should add GET /chalkboard to AlfredApiService and one thin
+    method on AlfredRepository, and get caching/fallback for free:
+      * AlfredApiService — Retrofit interface, one method per endpoint
+      * AlfredClient — builds the service from the saved address, rebuilds only
+        when it changes; 3s timeouts (Alfred is on the LAN: it answers fast or
+        it isn't there, and a content screen must never hang mid-morning)
+      * AlfredRepository.fetch — generic: caches every success, serves the cached
+        response when Alfred is unreachable, returns Unavailable only if there's
+        nothing cached. Never throws; Alfred being down is an ordinary morning
+      * AlfredResult = Fresh / Stale(cachedAt) / Unavailable — the three cases
+        every Alfred screen renders
+      * AlfredResponseCache — last successful body per endpoint (SharedPreferences).
+        An unparseable cache is discarded, not retried forever
+  - Settings: "Alfred host address" (host:port, default 192.168.1.100:8200) in a
+    new Alfred section, deliberately NOT nested under the schedule toggle since AF
+    shares it. Input is normalised (strips pasted scheme/path, adds default port)
+    and validated — a typo would otherwise only surface at 6am
+  - Screen: GET /daily-schedule, grouped Morning/Afternoon/Evening/Anytime, API
+    order preserved within a group, markdown in `task` rendered (MarkdownRenderer,
+    **bold**/*italic*). Read-only: no completion state, no timestamps. 15s dismiss
+    lock reused from the Card AA pattern
+  - The lock starts when the screen shows, NOT when Alfred answers — a slow or
+    absent Alfred must not lengthen the morning or block the NFC sequence
+  - Schedule renders into its own scrollable view, not the shared centred
+    content_body: real tasks are long, and the panel had no scroll (added
+    layout_constrainedHeight so a long schedule can't push past the Stop button)
+  - Toggle seeding now inserts any MISSING content type rather than only seeding an
+    empty table — otherwise DAILY_SCHEDULE would never reach this install (which
+    already has toggle rows) and the settings switch would silently do nothing.
+    Default off: it needs an Alfred address first. No DB migration needed (enum
+    stored as TEXT)
+  - VERIFIED on the A32 against the live Alfred: real schedule fetched, parsed and
+    grouped am/pm correctly; unreachable host fell back to the cached response
+    (Stale) and to Unavailable with no cache. Done via a temporary instrumented
+    test, since the content screen itself needs physical NFC taps to reach — the
+    on-phone Stage 2 run is still untested and is Nick's to do
+  - 82 unit tests passing

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Typeface
 import android.media.AudioManager
 import android.nfc.NfcAdapter
 import android.os.Build
@@ -16,10 +17,14 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.StyleSpan
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -35,10 +40,17 @@ import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.StretchExercise
 import com.personalmorningalarm.data.model.ContentType
+import com.personalmorningalarm.data.model.DailySchedule
 import com.personalmorningalarm.data.model.MorningGoal
+import com.personalmorningalarm.data.model.ScheduleGroup
+import com.personalmorningalarm.data.model.SchedulePeriod
+import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.remote.AlfredRepository
+import com.personalmorningalarm.data.remote.AlfredResult
 import com.personalmorningalarm.databinding.ActivityAlarmDismissalBinding
 import com.personalmorningalarm.service.AlarmService
 import com.personalmorningalarm.service.CountdownService
+import com.personalmorningalarm.util.MarkdownRenderer
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.ceil
@@ -54,6 +66,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAlarmDismissalBinding
     private lateinit var shakeChallenge: ShakeChallenge
     private lateinit var repository: AlarmRepository
+    private val alfredRepository: AlfredRepository by lazy { AlfredRepository(this) }
 
     private val argbEvaluator = ArgbEvaluator()
     private var vibrator: Vibrator? = null
@@ -320,8 +333,11 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.content.visibility = View.GONE
         binding.contentPanel.visibility = View.VISIBLE
         binding.contentAuthor.visibility = View.GONE
+        binding.contentNote.visibility = View.GONE
         binding.contentTimer.visibility = View.GONE
         binding.tvStretchProgress.visibility = View.GONE
+        binding.scheduleScroll.visibility = View.GONE
+        binding.contentBody.visibility = View.VISIBLE
         stretchTimer?.cancel()
         // Reset the Continue control: enabled by default (the quote screen locks it).
         contentDismissTimer?.cancel()
@@ -336,6 +352,7 @@ class AlarmDismissalActivity : AppCompatActivity() {
             ContentType.QUOTE -> showQuoteContent()
             ContentType.STRETCH -> showStretchContent()
             ContentType.PLACEHOLDER -> showGoalContent()
+            ContentType.DAILY_SCHEDULE -> showDailyScheduleContent()
         }
         Log.d(TAG, "Content screen shown: $type")
     }
@@ -443,6 +460,89 @@ class AlarmDismissalActivity : AppCompatActivity() {
             }
             override fun onFinish() = onContentContinue() // auto-advance when timer ends
         }.start()
+    }
+
+    /**
+     * Today's schedule from Alfred. The dismiss lock starts now rather than when
+     * Alfred answers: a slow or absent Alfred must not lengthen the morning, and
+     * the fetch can't fail in a way that strands this screen — the worst case is
+     * "Schedule unavailable" and Continue frees up on schedule either way.
+     */
+    private fun showDailyScheduleContent() {
+        binding.contentHeading.text = getString(R.string.content_schedule_heading)
+        binding.contentBody.text = getString(R.string.schedule_loading)
+        startContentDismissLock()
+
+        // The gap this screen belongs to. If Alfred answers after the user has moved
+        // on, the answer belongs to a screen that's gone — drop it rather than paint
+        // it over whatever is up now.
+        val gap = gapsShown
+        lifecycleScope.launch {
+            val result = alfredRepository.getDailySchedule()
+            if (!showingContent || gapsShown != gap) {
+                Log.d(TAG, "Daily schedule arrived after the screen moved on — dropped")
+                return@launch
+            }
+            renderSchedule(result)
+        }
+    }
+
+    private fun renderSchedule(result: AlfredResult<List<ScheduleTaskDto>>) {
+        if (result is AlfredResult.Stale) {
+            binding.contentNote.visibility = View.VISIBLE
+            binding.contentNote.text = getString(R.string.schedule_stale)
+        }
+
+        val tasks = when (result) {
+            is AlfredResult.Fresh -> result.data
+            is AlfredResult.Stale -> result.data
+            AlfredResult.Unavailable -> {
+                Log.d(TAG, "Daily schedule: Alfred unreachable and nothing cached")
+                binding.contentBody.text = getString(R.string.schedule_unavailable)
+                return
+            }
+        }
+
+        val groups = DailySchedule.group(tasks)
+        if (groups.isEmpty()) {
+            binding.contentBody.text = getString(R.string.schedule_empty)
+            return
+        }
+        binding.contentBody.visibility = View.GONE
+        binding.scheduleScroll.visibility = View.VISIBLE
+        binding.tvSchedule.text = formatSchedule(groups)
+        Log.d(TAG, "Daily schedule: ${groups.size} groups, ${tasks.size} tasks (stale=${result is AlfredResult.Stale})")
+    }
+
+    /** Bold period heading, then that period's tasks with their markdown rendered. */
+    private fun formatSchedule(groups: List<ScheduleGroup>): CharSequence {
+        val out = SpannableStringBuilder()
+        groups.forEach { group ->
+            if (out.isNotEmpty()) out.append("\n\n")
+            val start = out.length
+            out.append(getString(periodHeading(group.period)))
+            out.setSpan(
+                StyleSpan(Typeface.BOLD),
+                start,
+                out.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            group.tasks.forEach { task ->
+                out.append("\n")
+                // Format the bullet around the rendered task so the markdown spans
+                // survive — getString would flatten them to plain text.
+                out.append("• ").append(MarkdownRenderer.render(task))
+            }
+        }
+        return out
+    }
+
+    @StringRes
+    private fun periodHeading(period: SchedulePeriod): Int = when (period) {
+        SchedulePeriod.MORNING -> R.string.schedule_period_morning
+        SchedulePeriod.AFTERNOON -> R.string.schedule_period_afternoon
+        SchedulePeriod.EVENING -> R.string.schedule_period_evening
+        SchedulePeriod.UNGROUPED -> R.string.schedule_period_ungrouped
     }
 
     private fun showGoalContent() {
