@@ -17,7 +17,17 @@ Commands
 ./gradlew assembleDebug - Build debug APK
 ./gradlew installDebug - Build and install on connected device
 ./gradlew test - Run unit tests
-./gradlew connectedAndroidTest - Run instrumented tests
+./gradlew connectedAndroidTest - Run instrumented tests. NEVER against the A32 — see below
+
+Never run connectedAndroidTest against the A32. AGP uninstalls the app when the run
+ends, which wipes its data directory — on 2026-07-16 this destroyed registered NFC
+tags and a month of alarm history, and the reinstall then silently restored a stale
+cloud backup, disguising the wipe as partial data loss. gradle.properties now sets
+leaveApksInstalledAfterRun=true, but that only stops the uninstall: an instrumented
+test still runs inside the app's own data directory and can overwrite its database
+and prefs. Verify on-device with installDebug + adb (update installs preserve data);
+keep logic in the Robolectric unit tests; use an emulator if instrumentation is
+genuinely needed.
 
 Build prerequisite: gradle needs JAVA_HOME pointing at a JDK 17+ (this dev box has
 no java on PATH by default). Android Studio's bundled JBR works:
@@ -38,7 +48,8 @@ Conventions
 Min API level 26, target API 34
 Primary test device: Samsung Galaxy A32 5G, model SM-A326B (Android 13 / API 33)
 MVVM architecture with Repository pattern throughout
-Public repo — never commit credentials, tokens, personal data, or private network details
+Public repo — never commit credentials, tokens, personal data, public IPs or hostnames, port-forwards, or VPN endpoints
+RFC1918 LAN defaults (192.168.x.x, 10.x.x.x, 172.16-31.x.x) are fine to commit — non-routable, unreachable from outside, and reveal nothing about the network. e.g. the Alfred host default 192.168.1.100:8200
 Foreground services for alarm and countdown reliability
 Extensible challenge system — new challenges implement a common interface
 
