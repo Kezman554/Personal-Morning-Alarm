@@ -842,3 +842,43 @@
     test, since the content screen itself needs physical NFC taps to reach — the
     on-phone Stage 2 run is still untested and is Nick's to do
   - 82 unit tests passing
+
+2026-07-16  INCIDENT: test alarm sounded with no way to turn it off
+  - SYMPTOM: test alarm fired, sounded correctly, but no dismissal screen ever
+    appeared. No crash in logcat — nothing to point at. (The 15s countdowns and
+    nuclear fires in the log around 21:04 were the HomeFragment dev-tools test
+    button, working as intended — a red herring.)
+  - ROOT CAUSE: notifications were blocked (importance=NONE, POST_NOTIFICATION:
+    ignore). AlarmService's notification full-screen intent is the ONLY path that
+    puts the dismissal screen up, so with notifications off the alarm sounds at
+    full volume and nothing can display the screen that stops it. The app declared
+    POST_NOTIFICATIONS in the manifest but never requested it, so it could not
+    recover on its own — and on API 33+ it's denied by default
+  - WHY IT SURFACED NOW: the app was freshly installed at 18:32 by this session's
+    gradle install/connectedAndroidTest run — proven by the uid changing 10467 ->
+    10471 and firstInstallTime resetting. A fresh install resets runtime
+    permissions. The bug was latent from the start; the reinstall exposed it.
+    Any new phone or reinstall reproduces it
+  - IMMEDIATE: force-stopped the app to kill the sound, re-granted the permission
+    via adb. NOTE force-stop also cancels the app's pending AlarmManager alarms —
+    relaunching the app re-armed 06:00 (verified pending in dumpsys alarm). The
+    launch-time re-arm in MainActivity is what saves this
+  - FIX (own commit, branch fix/notification-permission off main): MainActivity
+    requests POST_NOTIFICATIONS and re-checks on every onStart (the grant can
+    vanish under the app); if it can't be requested — denied twice, or turned off
+    in settings, where the system dialog silently no-ops — the app explains the
+    consequence and routes to notification settings. Settings gained a status row
+    mirroring the battery one. The check reads areNotificationsEnabled() rather
+    than the permission grant alone, since the grant can read as granted while
+    delivery is still blocked
+  - VERIFIED on the A32, all three paths: blocked+never-asked -> system dialog ->
+    Allow -> granted=true, importance NONE -> DEFAULT; blocked+already-asked ->
+    the app's own warning -> settings; enabled -> silent, no nagging
+  - DIAGNOSIS RECIPE for next time: `dumpsys notification | grep -A3 <pkg>` —
+    importance=NONE is the tell; `cmd appops get <pkg> POST_NOTIFICATION`
+  - KNOWN ISSUE (not fixed, noticed while testing): Converters.toContentType uses
+    ContentType.valueOf, which throws IllegalArgumentException on an unknown name
+    and hard-crashes the app at launch. Hit it by installing a build without
+    DAILY_SCHEDULE over a DB that had the row (branch switching). Only a downgrade
+    or a removed/renamed ContentType triggers it, but the failure is a launch
+    crash — worth a defensive fallback if content types ever churn
