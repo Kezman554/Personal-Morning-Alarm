@@ -876,9 +876,54 @@
     the app's own warning -> settings; enabled -> silent, no nagging
   - DIAGNOSIS RECIPE for next time: `dumpsys notification | grep -A3 <pkg>` —
     importance=NONE is the tell; `cmd appops get <pkg> POST_NOTIFICATION`
-  - KNOWN ISSUE (not fixed, noticed while testing): Converters.toContentType uses
+  - KNOWN ISSUE (FIXED same day — see the next entry): Converters.toContentType uses
     ContentType.valueOf, which throws IllegalArgumentException on an unknown name
     and hard-crashes the app at launch. Hit it by installing a build without
     DAILY_SCHEDULE over a DB that had the row (branch switching). Only a downgrade
     or a removed/renamed ContentType triggers it, but the failure is a launch
     crash — worth a defensive fallback if content types ever churn
+
+2026-07-16  Enum-name launch crash fixed (the known issue logged above)
+  - Both enums are stored by name, so a name this build doesn't have reaches the
+    Room converters, where valueOf threw and killed the app at launch. Reproduced
+    for real: installing a build without DAILY_SCHEDULE over a DB holding the row
+    gave "No enum constant ContentType.DAILY_SCHEDULE" on startup. A downgrade
+    triggers it today; renaming or removing any stored enum value would trigger it
+    for every install
+  - Each converter now degrades in whichever direction loses least:
+      * Content toggles: filtered in SQL on ContentType.knownNames, so an unknown
+        row is never read — and never rewritten, so a newer build's data survives a
+        downgrade intact. toContentType stays STRICT on purpose: guessing a
+        stand-in would show the wrong screen and writing the guess back would
+        destroy the original name. Reaching the throw now means a query forgot the
+        filter — and Room rejects an unused query param, so the filter can't be
+        dropped silently (confirmed by trying it)
+      * MorningGoal: falls back to the default instead, because it rides on the
+        alarm config — refusing that row would take the alarm with it, and a wrong
+        goal label beats an alarm that never fires
+  - VERIFIED against the exact crashing state on the A32: app launches clean over a
+    DB holding a DAILY_SCHEDULE row, and the unknown row is left intact. The new
+    tests were checked against the pre-fix code and DO fail there — a test that
+    passes before and after proves nothing
+  - Note for future device debugging: `strings` doesn't exist in this Git Bash, so
+    `strings file | grep x` silently returns nothing and reads as "not found".
+    Use `grep -a` on the raw bytes, and `adb exec-out` (not `adb shell`) for binary
+    pulls — `adb shell` mangles them
+
+2026-07-16  Session close: Card AE + both fixes merged to main
+  - Daily Schedule CONFIRMED WORKING on the A32 through a real Stage 2 run
+  - Merged to main: Card AE (Daily Schedule + reusable Alfred plumbing),
+    fix/notification-permission, fix/unknown-content-type. 92 unit tests passing
+  - Card AF (Rolling To-Do) picks up the Alfred client as-is: add
+    @GET("chalkboard") to AlfredApiService plus one thin AlfredRepository method,
+    and caching / unreachable-fallback / the host setting all come for free. The
+    host lives in its own Alfred settings section, not under the schedule toggle,
+    precisely so AF shares it
+  - Still open from Card AE review: DEFAULT_HOST hardcodes 192.168.1.100:8200 in a
+    public repo. The card specified that default and it's a non-routable RFC1918
+    address, but CLAUDE.md says never commit private network details — swap it for
+    a blank default if that matters
+  - Watch on the next real morning: the schedule renders into its own scrollable
+    view because real Alfred tasks are long; the panel is height-constrained so it
+    can't push past the Stop button. Daily Schedule seeds OFF and last in display
+    order, so it only appears once enabled and given a gap to land in
