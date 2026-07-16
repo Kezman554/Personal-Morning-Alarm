@@ -927,3 +927,42 @@
     view because real Alfred tasks are long; the panel is height-constrained so it
     can't push past the Stop button. Daily Schedule seeds OFF and last in display
     order, so it only appears once enabled and given a gap to land in
+
+2026-07-16  INCIDENT: instrumented test run wiped real device data
+  - LOST: two/three NFC tags registered 15 Jul (Basildon Park Photo, Fish Bowl,
+    possibly a third) and alarm_events from 14 Jun to 15 Jul (~a month of streak
+    history). Not recoverable — see below
+  - CAUSE: `./gradlew connectedDebugAndroidTest` at 18:25:24, run to verify the
+    Alfred connection on the A32. AGP uninstalls the app + test APKs when the run
+    finishes, and uninstalling WIPES the app's data directory. The 18:32
+    installDebug then reinstalled, and android:allowBackup="true" made Android
+    silently restore the last cloud backup — which was ~5 weeks stale (13 Jun)
+  - WHY IT LOOKED IMPOSSIBLE: the restore brought back the three older tags but
+    not the newer ones, so it read as "someone deleted only the new tags" rather
+    than "the database was replaced by an old copy". A wipe that restores looks
+    like selective deletion. Same reinstall also reset POST_NOTIFICATIONS, which
+    is what produced the unstoppable alarm earlier in the session — one cause,
+    two symptoms, and the connection was missed at the time
+  - PROOF (reusable forensics): sqlite_sequence holds the highest AUTOINCREMENT id
+    ever issued per table and survives row deletion but not a wipe/restore.
+    nfc_tags read 5 while the missing tags would have been ids 6+ — so they had
+    NEVER existed in that database; it was an old copy, not a deletion. Corroborated
+    by: alarm_events jumping 2026-06-13 -> 2026-07-16 despite dumpsys alarm showing
+    fires on 07-01..07-06; databases/ dir created 18:32; the .db file carrying a
+    1970-01-21 mtime (restored-file signature); com.personalmorningalarm.test
+    installed 18:25:24 and gone with nobody uninstalling it; uid 10467 -> 10471
+  - NOT RECOVERABLE: a fresh backup ran at 21:59:59 the same evening and overwrote
+    the cloud copy with the restored stale data, so there is nothing older to go
+    back to. Physical tags must be re-registered by hand
+  - PREVENTION: gradle.properties now sets
+    android.injected.androidTest.leaveApksInstalledAfterRun=true (verified present
+    in AGP 8.7.3's BooleanOption enum, Stage.Stable, default false — so the default
+    really was uninstall-after-run). NOT empirically tested: proving it would mean
+    running connectedAndroidTest on the A32, which is exactly what must never
+    happen again, and no AVD is configured
+  - THE RULE: never run connectedAndroidTest on the A32. The flag only removes the
+    uninstall — an instrumented test still executes inside the app's own data dir
+    and can overwrite its database and prefs (the Alfred test wrote to the real
+    SharedPreferences). Verify on-device with installDebug + adb (an update install
+    preserves data); keep logic in the Robolectric unit tests; use an emulator or a
+    spare device if an instrumented test is genuinely required
