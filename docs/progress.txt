@@ -860,3 +860,25 @@
     `adb exec-out run-as <pkg> cat databases/<db>` (+ -wal; `adb shell` mangles binary).
     `strings` does not exist in this Git Bash — `strings | grep` silently reads as
     "not found"; use `grep -a`
+
+2026-07-16  Card AF: Rolling To-Do List content screen (Alfred /chalkboard)
+  - Read-only checklist of the vault's unchecked rolling-todo items. Alfred filters —
+    the app never ticks anything off. Date (when present) on a faint smaller second
+    line; absent/blank date renders NO line, never "null". ISO dates show as
+    "5 Jul 2026"; anything else is passed through as sent rather than dropped
+  - Card AE's plumbing held: this needed +8 lines on AlfredApiService (@GET("chalkboard"))
+    and +9 on AlfredRepository (one fetch() call). Caching, unreachable-fallback, the
+    stale marker and the host setting all came free, unchanged. Endpoints cache
+    independently (test covers it)
+  - NEW: util/VaultText — resolves [[wikilinks]] the way Obsidian shows them (alias
+    wins; [[a#b]] -> "a > b"; ![[x]] embeds too), then delegates to MarkdownRenderer for
+    **bold**/*italic*. Real items DO carry wikilinks (e.g. "See [[pi-admin-guide]] §9a").
+    The daily-schedule screen now uses VaultText too — same vault, so its text can carry
+    the same syntax, and it was previously one code path away from showing raw [[ ]]
+  - Card AE's schedule_scroll/tv_schedule renamed to content_list_scroll/tv_content_list
+    and shared by both Alfred screens rather than duplicating a ScrollView
+  - Toggle "Rolling To-Do List (Alfred)", seeds OFF at display order 4. With quote +
+    stretch also on it lands in gap 3, so it needs >=4 NFC checkpoints to appear
+  - 115 unit tests passing. Installs and launches clean on the A32 (CHALKBOARD toggle
+    seeded into the existing DB); NOT yet seen through a real Stage 2 — that needs NFC
+    taps. Unverified visually: the "☐" ballot-box glyph, and the 20-item list length

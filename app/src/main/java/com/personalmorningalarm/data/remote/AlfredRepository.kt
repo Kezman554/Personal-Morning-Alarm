@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,13 @@ class AlfredRepository(
             endpoint = ENDPOINT_DAILY_SCHEDULE,
             type = object : TypeToken<List<ScheduleTaskDto>>() {}.type
         ) { it.getDailySchedule() }
+
+    /** The rolling to-do from Alfred, falling back to the last one it served. */
+    suspend fun getChalkboard(): AlfredResult<List<ChalkboardTaskDto>> =
+        fetch(
+            endpoint = ENDPOINT_CHALKBOARD,
+            type = object : TypeToken<List<ChalkboardTaskDto>>() {}.type
+        ) { it.getChalkboard() }
 
     /**
      * Calls [request], caching its response under [endpoint]. [type] is how the
@@ -79,5 +87,6 @@ class AlfredRepository(
         private const val TAG = "PMA"
 
         const val ENDPOINT_DAILY_SCHEDULE = "daily-schedule"
+        const val ENDPOINT_CHALKBOARD = "chalkboard"
     }
 }

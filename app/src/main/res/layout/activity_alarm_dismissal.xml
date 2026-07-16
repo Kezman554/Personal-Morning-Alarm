@@ -90,9 +90,9 @@
 
     </LinearLayout>
 
-    <!-- Content screen (quote / stretch / placeholder / schedule), between checkpoints.
-         constrainedHeight keeps a long schedule inside the panel's bounds instead of
-         growing past the Stop button; schedule_scroll is the child that gives way. -->
+    <!-- Content screen (quote / stretch / placeholder / schedule / to-do), between
+         checkpoints. constrainedHeight keeps a long list inside the panel's bounds
+         instead of growing past the Stop button; content_list_scroll gives way. -->
     <LinearLayout
         android:id="@+id/content_panel"
         android:layout_width="0dp"
@@ -163,10 +163,11 @@
             tools:text="— Nelson Mandela"
             tools:visibility="visible" />
 
-        <!-- Daily schedule (Alfred): a grouped, start-aligned list, unlike the
-             centred single-block content_body the other screens use. -->
+        <!-- Long start-aligned list, unlike the centred single-block content_body
+             the other screens use. Shared by the Alfred screens (schedule, rolling
+             to-do), whose real content runs to many lines. -->
         <ScrollView
-            android:id="@+id/schedule_scroll"
+            android:id="@+id/content_list_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -175,7 +176,7 @@
             tools:visibility="visible">
 
             <TextView
-                android:id="@+id/tv_schedule"
+                android:id="@+id/tv_content_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:lineSpacingMultiplier="1.15"
