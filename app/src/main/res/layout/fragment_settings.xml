@@ -44,6 +44,29 @@
                 android:text="@string/theme_system" />
         </RadioGroup>
 
+        <!-- Notifications — the alarm's dismissal screen rides on them -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/notifications_section_title"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+        <TextView
+            android:id="@+id/tv_notifications_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            tools:text="Blocked — the alarm will sound with no way to turn it off." />
+
+        <Button
+            android:id="@+id/btn_notifications"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/notifications_button" />
+
         <!-- Battery optimisation -->
         <TextView
             android:layout_width="wrap_content"

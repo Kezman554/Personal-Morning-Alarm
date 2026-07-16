@@ -26,6 +26,7 @@ import com.personalmorningalarm.databinding.DialogAlfredHostBinding
 import com.personalmorningalarm.databinding.DialogDurationSliderBinding
 import com.personalmorningalarm.databinding.FragmentSettingsBinding
 import com.personalmorningalarm.util.BatteryOptimisationHelper
+import com.personalmorningalarm.util.NotificationPermissionHelper
 import com.personalmorningalarm.util.PinManager
 import com.personalmorningalarm.util.SoundPreviewPlayer
 import com.personalmorningalarm.util.ThemeManager
@@ -86,6 +87,10 @@ class SettingsFragment : Fragment() {
 
         binding.btnBattery.setOnClickListener {
             BatteryOptimisationHelper.showExplanationDialog(requireContext())
+        }
+
+        binding.btnNotifications.setOnClickListener {
+            NotificationPermissionHelper.openNotificationSettings(requireContext())
         }
 
         binding.btnManageTags.setOnClickListener {
@@ -398,6 +403,17 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         renderBatteryStatus()
+        renderNotificationStatus()
+    }
+
+    /** Reflects whether notifications can actually be delivered (refreshed on return). */
+    private fun renderNotificationStatus() {
+        val enabled = NotificationPermissionHelper.areNotificationsEnabled(requireContext())
+        binding.tvNotificationsStatus.text = getString(
+            if (enabled) R.string.notifications_status_enabled
+            else R.string.notifications_status_blocked
+        )
+        binding.btnNotifications.isEnabled = !enabled
     }
 
     /** Reflects the current battery-optimisation state (refreshed on return). */
