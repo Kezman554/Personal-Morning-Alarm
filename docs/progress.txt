@@ -926,3 +926,27 @@
     would destroy a newer build's data on a downgrade, which is the thing the filter
     exists to prevent. It costs one ignored row
   - 128 unit tests passing
+
+2026-07-17  Tile home screen; alarm relocated; Statistics removed
+  - App now opens on a tile grid (TilesFragment / fragment_tiles.xml, tiles built
+    from item_tile.xml). Two live tiles — Daily Schedule and Rolling To-Do — navigate
+    to the existing Today screen narrowed by ARG_SECTION (SCHEDULE / CHALKBOARD).
+    KitchenSync and Kanban render greyed (alpha 0.4) and inert: they get no click
+    listener at all, so there's no dead tap to swallow and nothing to wire by accident
+  - Bottom nav is now Home (tiles) / Alarm / Settings. The old Home screen is unchanged,
+    just moved one slot along behind the Alarm button (ic_alarm added). nav_graph
+    startDestination = tilesFragment, so a fresh launch lands on the tiles
+  - Statistics deleted fully: StatisticsFragment/ViewModel, WeeklyBarChartView,
+    DayHeatmapView, EventHistoryAdapter, their layouts, ic_statistics, and the orphaned
+    stat_success/stat_failure/stat_empty colors
+  - CHECKED BEFORE DELETING (the alarm leans on the "stats" store): alarm_events is NOT
+    stats-only. The dismissal path writes Stage 1/2 successes + nuclear failures, and
+    reads getCurrentStreak() for the "Day N of your streak!" line; NuclearDismissal logs
+    the streak too. So the table, its writes, getCurrentStreak and getSuccessDatesDesc
+    all stay. Only the stats-only repo/DAO helpers were cut: getLongestStreak,
+    getWeeklySuccessRate, getSuccessDatesAsc, getSuccessRateSince
+  - 125 unit tests passing (was 128; the three stats-only RepositoryTest cases went with
+    the queries). Debug APK builds clean
+  - NOT YET verified on device: "alarm still fires + dismisses as before" needs a real
+    A32 run (installDebug — update install preserves data; never connectedAndroidTest).
+    Nick to confirm a live morning fire
