@@ -12,6 +12,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import com.personalmorningalarm.R
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
@@ -177,6 +178,10 @@ class HomeFragment : Fragment() {
     // --- Temporary dev tools ---
 
     private fun setupDevTools() {
+        binding.btnOpenToday.setOnClickListener {
+            findNavController().navigate(R.id.action_home_to_today)
+        }
+
         binding.btnTestAlarm.setOnClickListener {
             if (!scheduler.canScheduleExactAlarms()) {
                 promptForExactAlarmPermission()
