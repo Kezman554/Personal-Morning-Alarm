@@ -947,6 +947,12 @@
     getWeeklySuccessRate, getSuccessDatesAsc, getSuccessRateSince
   - 125 unit tests passing (was 128; the three stats-only RepositoryTest cases went with
     the queries). Debug APK builds clean
-  - NOT YET verified on device: "alarm still fires + dismisses as before" needs a real
-    A32 run (installDebug — update install preserves data; never connectedAndroidTest).
-    Nick to confirm a live morning fire
+  - VERIFIED on device (SM-A326B, installDebug — update install, data preserved): fresh
+    launch lands on the tile grid (two live tiles + KitchenSync/Kanban greyed "Coming
+    soon"); Home/Alarm/Settings nav order correct; Alarm button opens the relocated home
+    screen, which still shows "Current streak: 2 days" / "This week: 2/2 days" — i.e. the
+    alarm's read of alarm_events survived the stats removal. Used the Dev-tools "Schedule
+    test alarm (1 min)" button (leaves the real 6:00 alarm untouched): fired exactly on
+    time (16:19:29), AlarmReceiver -> AlarmService foreground, stream set to saved volume
+    (audible), and the real 6:00 alarm re-armed for tomorrow (alarmTime=360, ok=true).
+    Nick completed the full Stage 1 -> Stage 2 dismissal by hand — worked perfectly
