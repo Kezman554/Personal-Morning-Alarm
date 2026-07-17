@@ -1,5 +1,9 @@
 Claude · MDCopyProject: Personal Morning Alarm
-Two-stage Android alarm app with NFC checkpoints, toggleable content screens, and streak tracking.
+An Android personal-organizer app that opens on a tile home screen aggregating other
+tools (Daily Schedule, Rolling To-Do, with KitchenSync and Kanban to come), and also
+features a robust two-stage wake-up alarm with NFC checkpoints and toggleable content
+screens. The alarm — once the whole app — is now one area behind the Alarm tab; the
+tile grid is the landing screen.
 Built with Kotlin, MVVM, Room, Android NFC API, CameraX, ML Kit.
 Structure
 

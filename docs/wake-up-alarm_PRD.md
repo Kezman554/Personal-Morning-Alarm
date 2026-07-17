@@ -1,20 +1,27 @@
 Wake up alarm prd · MDCopyPersonal Morning Alarm - Product Requirements Document
-Version: 1.0
-Last Updated: April 2026
+Version: 2.0
+Last Updated: July 2026
 Overview
 Problem Statement
-Traditional alarms are too easy to dismiss, leading to snoozing and skipped morning goals. Users need a system that physically gets them out of bed, builds momentum through a guided wake-up sequence, and creates accountability through streak tracking — without disturbing household members.
+The user's day is scattered across separate tools — a to-do list, a schedule, and more — with no single place to see them, and mornings compound the problem: traditional alarms are too easy to dismiss, leading to snoozing and a slow start. This app is a personal-organizer hub: a tile home screen that aggregates those other tools in one glanceable place, built around a two-stage wake-up alarm that physically gets the user out of bed and into the day — without disturbing household members.
 Goals
 
+Give the user one landing screen that aggregates their day's tools (schedule, rolling to-do, and more to come)
 Reliably wake the user and get them physically moving through their space
 Create progressive accountability through multi-checkpoint dismissal
-Track streaks and success patterns to reinforce consistency
 Keep Stage 1 quiet enough to avoid disturbing a partner
-Build an extensible system that supports future integrations
+Build an extensible tile system that new aggregated tools can slot into
 
 Target Users
-Personal use. A single user who sets optional early morning goals (exercise, project work) but struggles with snoozing and needs structured accountability to follow through.
+Personal use. A single user who wants their schedule and to-do list in one place and struggles with snoozing, needing structured accountability to get moving in the morning.
 Features
+Home: Tile Aggregator (Landing Screen)
+
+The app opens on a grid of tiles, one per tool
+Live tiles: Daily Schedule and Rolling To-Do, each opening its aggregated view
+Coming-soon tiles: KitchenSync and Kanban render greyed and inert (no navigation yet)
+The wake-up alarm lives behind the Alarm tab, one slot along in the bottom nav (Home / Alarm / Settings)
+New tools are added as tiles rather than bolted onto the alarm
 Stage 1: Gentle Wake
 
 Soft alarm at scheduled time, moderate volume
@@ -53,9 +60,8 @@ Future: external data via API integration
 Data & Streaks
 
 Daily success/failure logging with timestamps
-Current and longest streak tracking
-Weekly success rate
-Statistics display on home screen and dedicated stats screen
+Current streak tracked and shown on the Alarm screen ("Current streak: N days", "This week: N/N days")
+No dedicated statistics screen — the streak lives inline on the Alarm screen; the alarm_events store is retained (the alarm reads it for the streak line)
 
 Settings
 
@@ -84,7 +90,8 @@ Widget or Wear OS support
 
 Future Considerations
 
-External API integration for personalised content (daily tasks, rolling to-do list, curated quotes/images)
+New aggregator tiles: KitchenSync and Kanban (currently coming-soon placeholders), plus further tools as tiles
+Deeper external integrations feeding the tiles (Daily Schedule and Rolling To-Do already pull aggregated content)
 Additional challenge types (photo verification, step counter, voice recording)
 Challenge pool system with random selection
 Gamification (XP, achievements, levels)
@@ -138,6 +145,7 @@ PersonalMorningAlarm/
 └── .gitignore
 Success Criteria
 
+ App opens on the tile home screen; live tiles open their aggregated views, coming-soon tiles are inert
  Alarm triggers reliably at scheduled time, including after device restart
  Stage 1 shake detection works accurately with clear progress feedback
  NFC tag registration and reading works consistently
