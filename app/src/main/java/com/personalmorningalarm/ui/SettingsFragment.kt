@@ -189,6 +189,13 @@ class SettingsFragment : Fragment() {
             )
         }
 
+        binding.switchChalkboard.setOnClickListener {
+            viewModel.setContentEnabled(
+                ContentType.CHALKBOARD,
+                binding.switchChalkboard.isChecked
+            )
+        }
+
         binding.rowAlfredHost.setOnClickListener { showAlfredHostDialog() }
         renderAlfredHost()
 
@@ -240,6 +247,8 @@ class SettingsFragment : Fragment() {
                             ContentType.PLACEHOLDER -> binding.switchPlaceholder.isChecked = t.isEnabled
                             ContentType.DAILY_SCHEDULE ->
                                 binding.switchDailySchedule.isChecked = t.isEnabled
+                            ContentType.CHALKBOARD ->
+                                binding.switchChalkboard.isChecked = t.isEnabled
                         }
                     }
                 }

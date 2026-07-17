@@ -200,6 +200,13 @@
             android:layout_marginTop="8dp"
             android:text="@string/toggle_daily_schedule" />
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_chalkboard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/toggle_chalkboard" />
+
         <Button
             android:id="@+id/btn_manage_quotes"
             style="?attr/materialButtonOutlinedStyle"

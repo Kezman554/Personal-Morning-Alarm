@@ -1,6 +1,7 @@
 package com.personalmorningalarm.data.remote
 
 import androidx.test.core.app.ApplicationProvider
+import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -21,19 +22,27 @@ class AlfredRepositoryTest {
     private val settings = AlfredSettings(context)
     private val cache = AlfredResponseCache(context)
 
-    /** An Alfred that answers with [response], or throws if it's null (unreachable). */
-    private fun repository(response: List<ScheduleTaskDto>?) = AlfredRepository(
+    /** An Alfred that answers each endpoint with the list given, or throws if null. */
+    private fun repository(
+        response: List<ScheduleTaskDto>? = null,
+        chalkboardResponse: List<ChalkboardTaskDto>? = null
+    ) = AlfredRepository(
         settings,
         cache,
         serviceProvider = {
             object : AlfredApiService {
                 override suspend fun getDailySchedule(): List<ScheduleTaskDto> =
                     response ?: throw IOException("Alfred unreachable")
+
+                override suspend fun getChalkboard(): List<ChalkboardTaskDto> =
+                    chalkboardResponse ?: throw IOException("Alfred unreachable")
             }
         }
     )
 
     private val schedule = listOf(ScheduleTaskDto("Gym", "am"), ScheduleTaskDto("Read", null))
+    private val chalkboard =
+        listOf(ChalkboardTaskDto("Plant the bamboo", "2026-07-05"), ChalkboardTaskDto("Fix fence", null))
 
     @Test
     fun `a reachable Alfred returns fresh data`() = runBlocking {
@@ -70,6 +79,47 @@ class AlfredRepositoryTest {
         val result = repository(null).getDailySchedule()
 
         assertEquals(newer, (result as AlfredResult.Stale).data)
+    }
+
+    // --- /chalkboard: same fetch(), so it inherits caching and fallback unchanged ---
+
+    @Test
+    fun `chalkboard returns fresh data from a reachable Alfred`() = runBlocking {
+        val result = repository(chalkboardResponse = chalkboard).getChalkboard()
+
+        assertTrue(result is AlfredResult.Fresh)
+        assertEquals(chalkboard, (result as AlfredResult.Fresh).data)
+    }
+
+    @Test
+    fun `chalkboard with no cache is unavailable, not an exception`() = runBlocking {
+        assertEquals(AlfredResult.Unavailable, repository().getChalkboard())
+    }
+
+    @Test
+    fun `chalkboard falls back to the last successful response, nulls intact`() = runBlocking {
+        repository(chalkboardResponse = chalkboard).getChalkboard() // populates the cache
+
+        val result = repository().getChalkboard()
+
+        assertTrue(result is AlfredResult.Stale)
+        assertEquals(chalkboard, (result as AlfredResult.Stale).data)
+        // The absent date must survive the cache round-trip as null, not "null".
+        assertEquals(null, result.data[1].date)
+    }
+
+    @Test
+    fun `the two endpoints cache independently`() = runBlocking {
+        // Only the schedule has ever succeeded.
+        repository(response = schedule).getDailySchedule()
+
+        // A schedule in the cache must not answer a chalkboard request.
+        assertEquals(AlfredResult.Unavailable, repository().getChalkboard())
+
+        // And caching the chalkboard must not disturb the schedule's entry.
+        repository(chalkboardResponse = chalkboard).getChalkboard()
+        val stale = repository().getDailySchedule()
+        assertEquals(schedule, (stale as AlfredResult.Stale).data)
     }
 
     @Test

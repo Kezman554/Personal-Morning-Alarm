@@ -7,7 +7,10 @@ enum class ContentType {
     PLACEHOLDER,
 
     /** Today's schedule, read from the Alfred Vault API. */
-    DAILY_SCHEDULE;
+    DAILY_SCHEDULE,
+
+    /** The rolling to-do list, read from the Alfred Vault API. */
+    CHALKBOARD;
 
     companion object {
         /**
