@@ -345,7 +345,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
         when (type) {
             ContentType.QUOTE -> showQuoteContent()
             ContentType.STRETCH -> showStretchContent()
-            ContentType.PLACEHOLDER -> showGoalContent()
             ContentType.DAILY_SCHEDULE -> showDailyScheduleContent()
             ContentType.CHALKBOARD -> showChalkboardContent()
         }
@@ -555,14 +554,6 @@ class AlarmDismissalActivity : AppCompatActivity() {
         binding.contentListScroll.visibility = View.VISIBLE
         binding.tvContentList.text = ChalkboardRenderer.format(items, COLOR_FAINT)
         Log.d(TAG, "Chalkboard: ${items.size} items (stale=${result is AlfredResult.Stale})")
-    }
-
-    private fun showGoalContent() {
-        binding.contentHeading.text = getString(R.string.content_goal_heading)
-        binding.contentBody.text = when (morningGoal) {
-            MorningGoal.EXERCISE -> getString(R.string.goal_exercise)
-            MorningGoal.PROJECT -> getString(R.string.goal_project)
-        }
     }
 
     private fun onContentContinue() {

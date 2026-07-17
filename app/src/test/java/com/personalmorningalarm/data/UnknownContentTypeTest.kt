@@ -95,6 +95,25 @@ class UnknownContentTypeTest {
         }
     }
 
+    /**
+     * The retired case, as opposed to the not-yet-known one: PLACEHOLDER was a real
+     * content type until the Daily Schedule replaced it, so every install upgraded
+     * from before then still has its row. It must be ignored, not fatal — and not
+     * deleted either: a build that still knows the type would want it back.
+     */
+    @Test
+    fun `a row for a retired content type is ignored, not fatal`() = runBlocking {
+        insertUnknownRow("PLACEHOLDER")
+        repo.saveContentToggle(ContentToggle(contentType = ContentType.QUOTE, displayOrder = 0))
+
+        assertEquals(listOf(ContentType.QUOTE), repo.getAllContentToggles().map { it.contentType })
+        assertEquals(listOf(ContentType.QUOTE), repo.getEnabledContentToggles().map { it.contentType })
+
+        db.openHelper.readableDatabase.query(
+            "SELECT contentType FROM content_toggles WHERE contentType = 'PLACEHOLDER'"
+        ).use { cursor -> assertEquals(1, cursor.count) }
+    }
+
     @Test
     fun `known types are unaffected by the filter`() = runBlocking {
         ContentType.entries.forEachIndexed { index, type ->

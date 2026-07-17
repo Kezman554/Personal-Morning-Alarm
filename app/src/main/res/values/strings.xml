@@ -58,7 +58,6 @@
     <string name="content_dismiss_seconds">%1$ds</string>
     <string name="content_quote_heading">Take a moment</string>
     <string name="content_stretch_heading">Stretch it out</string>
-    <string name="content_goal_heading">Today\'s goal</string>
     <string name="quote_author_format">— %1$s</string>
 
     <!-- Daily Schedule content screen (Alfred) -->
@@ -92,7 +91,6 @@
     <string name="content_section_title">Morning Content</string>
     <string name="toggle_quote">Motivational quote</string>
     <string name="toggle_stretch">Stretching prompt</string>
-    <string name="toggle_placeholder">Daily goal (placeholder)</string>
     <string name="toggle_daily_schedule">Daily schedule (Alfred)</string>
     <string name="toggle_chalkboard">Rolling To-Do List (Alfred)</string>
     <string name="stretch_duration_label">Stretch duration</string>

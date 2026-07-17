@@ -90,7 +90,7 @@
 
     </LinearLayout>
 
-    <!-- Content screen (quote / stretch / placeholder / schedule / to-do), between
+    <!-- Content screen (quote / stretch / schedule / to-do), between
          checkpoints. constrainedHeight keeps a long list inside the panel's bounds
          instead of growing past the Stop button; content_list_scroll gives way. -->
     <LinearLayout

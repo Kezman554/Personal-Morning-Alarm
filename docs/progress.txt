@@ -909,3 +909,20 @@
     is untouched (one call per content screen). The code comment says so rather than
     claiming a parallelism that doesn't survive measurement
   - 127 unit tests passing
+
+2026-07-17  Removed the Daily Goal (placeholder) content screen
+  - It was a stand-in for the Daily Schedule, which now exists — so the toggle,
+    the ContentType, the screen and its two strings are gone
+  - KEPT deliberately: MorningGoal itself (Home's goal selector, alarm events, the
+    goal->routine mapping) and goal_exercise/goal_project, still used by
+    EventHistoryAdapter. Only the content screen went
+  - This is the first real removal of a stored enum value, i.e. exactly what the
+    16 Jul ContentType.valueOf fix was built for. Existing installs still have a
+    'PLACEHOLDER' row in content_toggles; the knownNames SQL filter skips it, so it's
+    invisible rather than fatal. VERIFIED on the A32 — the device DB still holds the
+    row and the app launches clean, 0 FATALs, 0 "No enum constant". Before that fix
+    this same shape of change crashed the app at launch
+  - The dead row is deliberately NOT deleted: a cleanup that removed unknown rows
+    would destroy a newer build's data on a downgrade, which is the thing the filter
+    exists to prevent. It costs one ignored row
+  - 128 unit tests passing
