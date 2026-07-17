@@ -9,7 +9,17 @@
         android:id="@+id/homeFragment"
         android:name="com.personalmorningalarm.ui.HomeFragment"
         android:label="@string/title_home"
-        tools:layout="@layout/fragment_home" />
+        tools:layout="@layout/fragment_home">
+        <action
+            android:id="@+id/action_home_to_today"
+            app:destination="@id/todayFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/todayFragment"
+        android:name="com.personalmorningalarm.ui.TodayFragment"
+        android:label="@string/today_screen_title"
+        tools:layout="@layout/fragment_today" />
 
     <fragment
         android:id="@+id/statisticsFragment"

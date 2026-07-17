@@ -882,3 +882,30 @@
   - 115 unit tests passing. Installs and launches clean on the A32 (CHALKBOARD toggle
     seeded into the existing DB); NOT yet seen through a real Stage 2 — that needs NFC
     taps. Unverified visually: the "☐" ballot-box glyph, and the 20-item list length
+
+2026-07-17  Card AG: on-demand "Today" screen (schedule + rolling to-do)
+  - A glance surface outside the alarm entirely: Home -> "Today (schedule & to-do)".
+    No NFC gate, no dismiss timer, not a ContentScreenManager type. Pull-to-refresh
+    (SwipeRefreshLayout, which also supplies the loading spinner); read-only
+  - Card AE/AF inlined their rendering in AlarmDismissalActivity, so per the card it
+    was factored out first: ui/ScheduleRenderer + ui/ChalkboardRenderer, now used by
+    all three screens. Only difference passed in is the date colour (alarm panel is
+    white-on-blue; Today follows the theme)
+  - Each feed is held and rendered separately, so one endpoint being down never blanks
+    the other — that's the whole point of the screen and it's what the ViewModel tests
+    pin down
+  - VERIFIED ON DEVICE end-to-end (this is the first Alfred screen not behind the NFC
+    gate, so it could actually be driven): opened from Home, both sections rendered live
+    data, markdown bold rendered with no raw ** or [[ ]]. Pull-to-refresh proven to
+    refetch, not just scroll — "Today: refreshed — schedule=fresh(3), chalkboard=fresh(20)".
+    Wi-Fi off -> both sections independently showed "Saved copy — Alfred unreachable"
+    over cached content (stale(3)/stale(20)), no crash; Wi-Fi restored after
+  - RESOLVED from Card AF: the "☐" ballot-box glyph renders correctly on the A32 (screenshot),
+    no tofu — no need to fall back to "○"
+  - MEASURED, not assumed: the two fetches do start together (1ms apart, different
+    threads) but offline the screen still waits ~6s, not ~3s — OkHttp doesn't give each
+    attempt on the same unreachable host its own timeout window, so the second waits out
+    the first. Left as-is: user-initiated screen, spinner covers it, and the alarm path
+    is untouched (one call per content screen). The code comment says so rather than
+    claiming a parallelism that doesn't survive measurement
+  - 127 unit tests passing

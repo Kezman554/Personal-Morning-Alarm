@@ -7,7 +7,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Typeface
 import android.media.AudioManager
 import android.nfc.NfcAdapter
 import android.os.Build
@@ -17,16 +16,10 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.text.SpannableStringBuilder
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
-import android.text.style.StyleSpan
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
-import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -46,16 +39,12 @@ import com.personalmorningalarm.data.model.ContentType
 import com.personalmorningalarm.data.model.DailySchedule
 import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.data.model.RollingTodo
-import com.personalmorningalarm.data.model.RollingTodoItem
-import com.personalmorningalarm.data.model.ScheduleGroup
-import com.personalmorningalarm.data.model.SchedulePeriod
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.remote.AlfredRepository
 import com.personalmorningalarm.data.remote.AlfredResult
 import com.personalmorningalarm.databinding.ActivityAlarmDismissalBinding
 import com.personalmorningalarm.service.AlarmService
 import com.personalmorningalarm.service.CountdownService
-import com.personalmorningalarm.util.VaultText
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.ceil
@@ -516,31 +505,8 @@ class AlarmDismissalActivity : AppCompatActivity() {
         }
         binding.contentBody.visibility = View.GONE
         binding.contentListScroll.visibility = View.VISIBLE
-        binding.tvContentList.text = formatSchedule(groups)
+        binding.tvContentList.text = ScheduleRenderer.format(this, groups)
         Log.d(TAG, "Daily schedule: ${groups.size} groups, ${tasks.size} tasks (stale=${result is AlfredResult.Stale})")
-    }
-
-    /** Bold period heading, then that period's tasks with their markdown rendered. */
-    private fun formatSchedule(groups: List<ScheduleGroup>): CharSequence {
-        val out = SpannableStringBuilder()
-        groups.forEach { group ->
-            if (out.isNotEmpty()) out.append("\n\n")
-            val start = out.length
-            out.append(getString(periodHeading(group.period)))
-            out.setSpan(
-                StyleSpan(Typeface.BOLD),
-                start,
-                out.length,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-            group.tasks.forEach { task ->
-                out.append("\n")
-                // Format the bullet around the rendered task so the markdown spans
-                // survive — getString would flatten them to plain text.
-                out.append("• ").append(VaultText.render(task))
-            }
-        }
-        return out
     }
 
     /**
@@ -587,40 +553,8 @@ class AlarmDismissalActivity : AppCompatActivity() {
         }
         binding.contentBody.visibility = View.GONE
         binding.contentListScroll.visibility = View.VISIBLE
-        binding.tvContentList.text = formatChalkboard(items)
+        binding.tvContentList.text = ChalkboardRenderer.format(items, COLOR_FAINT)
         Log.d(TAG, "Chalkboard: ${items.size} items (stale=${result is AlfredResult.Stale})")
-    }
-
-    /**
-     * A read-only checklist: an unticked box per item — Alfred only sends unchecked
-     * ones, and nothing here ticks them off — with the item's date on a faint
-     * second line when it has one.
-     */
-    private fun formatChalkboard(items: List<RollingTodoItem>): CharSequence {
-        val out = SpannableStringBuilder()
-        items.forEach { item ->
-            if (out.isNotEmpty()) out.append("\n")
-            // Build the line around the rendered task so its emphasis spans survive —
-            // getString would flatten them to plain text.
-            out.append("☐  ").append(VaultText.render(item.task))
-            item.date?.let { date ->
-                out.append("\n")
-                val start = out.length
-                out.append("     ").append(date)
-                // Secondary, not competing with the task itself.
-                out.setSpan(RelativeSizeSpan(0.8f), start, out.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                out.setSpan(ForegroundColorSpan(COLOR_FAINT), start, out.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-        }
-        return out
-    }
-
-    @StringRes
-    private fun periodHeading(period: SchedulePeriod): Int = when (period) {
-        SchedulePeriod.MORNING -> R.string.schedule_period_morning
-        SchedulePeriod.AFTERNOON -> R.string.schedule_period_afternoon
-        SchedulePeriod.EVENING -> R.string.schedule_period_evening
-        SchedulePeriod.UNGROUPED -> R.string.schedule_period_ungrouped
     }
 
     private fun showGoalContent() {
