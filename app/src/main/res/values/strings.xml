@@ -4,7 +4,7 @@
 
     <!-- Bottom navigation destinations -->
     <string name="title_home">Home</string>
-    <string name="title_statistics">Statistics</string>
+    <string name="title_alarm">Alarm</string>
     <string name="title_settings">Settings</string>
 
     <!-- NFC tag management -->
@@ -83,6 +83,13 @@
     <string name="today_schedule_section">Today\'s Schedule</string>
     <string name="today_chalkboard_section">Rolling To-Do</string>
     <string name="home_open_today">Today (schedule &amp; to-do)</string>
+
+    <!-- Home tile grid -->
+    <string name="tile_daily_schedule">Daily Schedule</string>
+    <string name="tile_rolling_todo">Rolling To-Do</string>
+    <string name="tile_kitchen_sync">KitchenSync</string>
+    <string name="tile_kanban">Kanban</string>
+    <string name="tile_coming_soon">Coming soon</string>
     <string name="stretch_suggestions">• Reach for the sky\n• Roll your shoulders back\n• Reach down toward your toes\n• Gentle neck rolls\n• Side stretches, each way</string>
     <string name="goal_exercise">Exercise</string>
     <string name="goal_project">Project work</string>
@@ -266,27 +273,6 @@
     <string name="alfred_host_hint">host:port</string>
     <string name="alfred_host_help">Address of the Alfred Vault API on your home network. Port defaults to 8200.</string>
     <string name="alfred_host_invalid">Enter an address like 192.168.1.100:8200</string>
-
-    <!-- Statistics screen -->
-    <string name="stats_current_streak">Current streak</string>
-    <string name="stats_longest_streak">Longest streak</string>
-    <string name="stats_days_unit">days</string>
-    <string name="stats_day_unit">day</string>
-    <string name="stats_weeks_title">Weekly success rate</string>
-    <string name="stats_weeks_subtitle">Last 4 weeks</string>
-    <string name="stats_heatmap_title">Daily history</string>
-    <string name="stats_heatmap_subtitle">Last 4 weeks</string>
-    <string name="stats_history_title">History</string>
-    <string name="stats_history_empty">No wake-ups recorded yet.</string>
-    <string name="stats_legend_success">Done</string>
-    <string name="stats_legend_failure">Missed</string>
-    <string name="stats_legend_none">No alarm</string>
-    <string name="stats_week_rate">%1$d/%2$d</string>
-    <string name="stats_history_success">✓</string>
-    <string name="stats_history_failure">✗</string>
-    <!-- Secondary line: "Exercise · 1:25" (success) or "Exercise · missed" (failure) -->
-    <string name="stats_history_detail">%1$s · %2$s</string>
-    <string name="stats_history_missed">missed</string>
 
     <!-- Temporary dev controls -->
     <string name="schedule_test_alarm">Schedule test alarm (1 min)</string>

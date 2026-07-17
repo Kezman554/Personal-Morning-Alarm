@@ -3,29 +3,42 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/homeFragment">
+    app:startDestination="@id/tilesFragment">
 
+    <!-- The tile grid: what the app opens on. -->
+    <fragment
+        android:id="@+id/tilesFragment"
+        android:name="com.personalmorningalarm.ui.TilesFragment"
+        android:label="@string/title_home"
+        tools:layout="@layout/fragment_tiles">
+        <action
+            android:id="@+id/action_tiles_to_today"
+            app:destination="@id/todayFragment" />
+    </fragment>
+
+    <!-- The alarm screen: what used to be Home. -->
     <fragment
         android:id="@+id/homeFragment"
         android:name="com.personalmorningalarm.ui.HomeFragment"
-        android:label="@string/title_home"
+        android:label="@string/title_alarm"
         tools:layout="@layout/fragment_home">
         <action
             android:id="@+id/action_home_to_today"
             app:destination="@id/todayFragment" />
     </fragment>
 
+    <!-- One destination, narrowed by TodayFragment.ARG_SECTION: the tiles open a
+         single feed each, the Alarm page's button opens both. -->
     <fragment
         android:id="@+id/todayFragment"
         android:name="com.personalmorningalarm.ui.TodayFragment"
         android:label="@string/today_screen_title"
-        tools:layout="@layout/fragment_today" />
-
-    <fragment
-        android:id="@+id/statisticsFragment"
-        android:name="com.personalmorningalarm.ui.StatisticsFragment"
-        android:label="@string/title_statistics"
-        tools:layout="@layout/fragment_statistics" />
+        tools:layout="@layout/fragment_today">
+        <argument
+            android:name="section"
+            android:defaultValue="BOTH"
+            app:argType="string" />
+    </fragment>
 
     <fragment
         android:id="@+id/settingsFragment"
