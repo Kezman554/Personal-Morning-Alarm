@@ -179,9 +179,6 @@ class SettingsFragment : Fragment() {
             viewModel.setContentEnabled(ContentType.STRETCH, enabled)
             binding.stretchDurationGroup.visibility = if (enabled) View.VISIBLE else View.GONE
         }
-        binding.switchPlaceholder.setOnClickListener {
-            viewModel.setContentEnabled(ContentType.PLACEHOLDER, binding.switchPlaceholder.isChecked)
-        }
         binding.switchDailySchedule.setOnClickListener {
             viewModel.setContentEnabled(
                 ContentType.DAILY_SCHEDULE,
@@ -244,7 +241,6 @@ class SettingsFragment : Fragment() {
                                     else R.id.rb_stretch_5
                                 )
                             }
-                            ContentType.PLACEHOLDER -> binding.switchPlaceholder.isChecked = t.isEnabled
                             ContentType.DAILY_SCHEDULE ->
                                 binding.switchDailySchedule.isChecked = t.isEnabled
                             ContentType.CHALKBOARD ->

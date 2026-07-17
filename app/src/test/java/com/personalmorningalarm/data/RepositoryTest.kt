@@ -112,7 +112,7 @@ class RepositoryTest {
             listOf(
                 ContentToggle(contentType = ContentType.QUOTE, isEnabled = true, displayOrder = 0),
                 ContentToggle(contentType = ContentType.STRETCH, isEnabled = true, displayOrder = 1),
-                ContentToggle(contentType = ContentType.PLACEHOLDER, isEnabled = false, displayOrder = 2)
+                ContentToggle(contentType = ContentType.DAILY_SCHEDULE, isEnabled = false, displayOrder = 2)
             )
         )
         assertEquals(3, repo.getAllContentToggles().size)
