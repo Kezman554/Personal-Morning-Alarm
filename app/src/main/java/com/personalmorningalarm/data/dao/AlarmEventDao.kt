@@ -41,26 +41,8 @@ interface AlarmEventDao {
 
     /**
      * Distinct successful days (Stage 2 completed), newest first. Used by the
-     * repository to compute current/longest streaks in Kotlin.
+     * repository to compute the current streak in Kotlin.
      */
     @Query("SELECT DISTINCT date FROM alarm_events WHERE stage2Success = 1 ORDER BY date DESC")
     suspend fun getSuccessDatesDesc(): List<String>
-
-    /** Distinct successful days, oldest first (for longest-streak scanning). */
-    @Query("SELECT DISTINCT date FROM alarm_events WHERE stage2Success = 1 ORDER BY date ASC")
-    suspend fun getSuccessDatesAsc(): List<String>
-
-    /**
-     * Fraction (0.0-1.0) of events on/after [cutoffDate] that were Stage 2 successes.
-     * Returns 0.0 when there are no events in the window.
-     */
-    @Query(
-        """
-        SELECT CASE WHEN COUNT(*) = 0 THEN 0.0
-            ELSE CAST(SUM(CASE WHEN stage2Success = 1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*)
-        END
-        FROM alarm_events WHERE date >= :cutoffDate
-        """
-    )
-    suspend fun getSuccessRateSince(cutoffDate: String): Float
 }

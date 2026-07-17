@@ -161,28 +161,6 @@ class AlarmRepository(private val db: AppDatabase) {
         return streak
     }
 
-    /** Longest run of consecutive successful days ever recorded. */
-    suspend fun getLongestStreak(): Int {
-        val successDays = alarmEventDao.getSuccessDatesAsc().map(LocalDate::parse)
-        if (successDays.isEmpty()) return 0
-
-        var longest = 1
-        var run = 1
-        for (i in 1 until successDays.size) {
-            run = if (successDays[i] == successDays[i - 1].plusDays(1)) run + 1 else 1
-            if (run > longest) longest = run
-        }
-        return longest
-    }
-
-    /**
-     * Stage 2 success rate (0.0-1.0) over the trailing 7 days, today inclusive.
-     */
-    suspend fun getWeeklySuccessRate(today: LocalDate = LocalDate.now()): Float {
-        val cutoff = today.minusDays(6).toString()
-        return alarmEventDao.getSuccessRateSince(cutoff)
-    }
-
     /**
      * Successful days and attempted days over the trailing 7 days (today
      * inclusive), as a (successDays, attemptedDays) pair — e.g. 4 to 5 renders

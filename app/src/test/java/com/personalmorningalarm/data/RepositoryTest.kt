@@ -225,14 +225,12 @@ class RepositoryTest {
     @Test
     fun `current streak is zero with no data`() = runBlocking {
         assertEquals(0, repo.getCurrentStreak(today))
-        assertEquals(0, repo.getLongestStreak())
     }
 
     @Test
     fun `single successful day today is a streak of one`() = runBlocking {
         success(today)
         assertEquals(1, repo.getCurrentStreak(today))
-        assertEquals(1, repo.getLongestStreak())
     }
 
     @Test
@@ -246,7 +244,6 @@ class RepositoryTest {
     fun `a last success older than yesterday is a dead streak`() = runBlocking {
         success(today.minusDays(2))
         assertEquals(0, repo.getCurrentStreak(today))
-        assertEquals(1, repo.getLongestStreak()) // still the longest ever recorded
     }
 
     @Test
@@ -256,7 +253,6 @@ class RepositoryTest {
         success(today.minusDays(2))
         success(today.minusDays(3))
         assertEquals(4, repo.getCurrentStreak(today))
-        assertEquals(4, repo.getLongestStreak())
     }
 
     @Test
@@ -275,18 +271,6 @@ class RepositoryTest {
         success(today.minusDays(2))
         nuclear(today)
         assertEquals(0, repo.getCurrentStreak(today))
-    }
-
-    @Test
-    fun `longest streak finds the longest historical run`() = runBlocking {
-        // Run of 3, gap, run of 2.
-        success(today.minusDays(10))
-        success(today.minusDays(9))
-        success(today.minusDays(8))
-        // gap
-        success(today.minusDays(5))
-        success(today.minusDays(4))
-        assertEquals(3, repo.getLongestStreak())
     }
 
     @Test
@@ -311,15 +295,4 @@ class RepositoryTest {
         assertEquals(3, attemptedDays)
     }
 
-    @Test
-    fun `weekly success rate is fraction of successes in the window`() = runBlocking {
-        success(today)
-        failure(today.minusDays(1))
-        assertEquals(0.5f, repo.getWeeklySuccessRate(today), 0.0001f)
-    }
-
-    @Test
-    fun `weekly success rate is zero with no events in the window`() = runBlocking {
-        assertEquals(0f, repo.getWeeklySuccessRate(today), 0.0001f)
-    }
 }
