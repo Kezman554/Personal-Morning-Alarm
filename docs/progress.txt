@@ -970,6 +970,10 @@
   - KEPT: TodayFragment, TodayViewModel, ScheduleRenderer/ChalkboardRenderer, and the
     TodaySection.BOTH value — BOTH is now only the defensive fallback for a missing/
     unknown section arg (comment updated to say so), not a reachable screen
-  - assembleDebug + testDebugUnitTest green. NOT yet installed on the A32 (device not
-    connected at commit time) — install to confirm the button is gone and both tiles
-    still open their feeds
+  - assembleDebug + testDebugUnitTest green
+  - VERIFIED on device (SM-A326B, installDebug): the Alarm tab no longer shows the Today
+    button (only streak + morning goal + Dev tools remain). Both Home tiles still work,
+    each opening its own single section with live Alfred data: Daily Schedule ->
+    schedule-only (section_schedule visible, section_chalkboard gone), "Morning • 7k
+    walk ..."; Rolling To-Do -> chalkboard-only, "☐ Reply to airer cover complaint ...".
+    Confirms the tiles pull from the Alfred API independently of the removed button
