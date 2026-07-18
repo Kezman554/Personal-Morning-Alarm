@@ -1044,8 +1044,15 @@
     broken-range fallback, unparseable keys, anchor + clamp) + 3 repository week
     tests; both fake AlfredApiServices gained the new method. 151 tests green;
     assembleDebug clean; installDebug onto the A32 (update install, data kept)
-  - NOT YET VERIFIED ON DEVICE: the phone is PIN-locked and adb can't (and
-    shouldn't) get past it. Still to drive once unlocked: tile → lands on today
-    (Sat 18 Jul, the plan's LAST day, so the forward hard edge is today's page),
-    swipe back to Mon 13 muted-but-readable, airplane mode → cached week + stale
-    note, and eyeball that the Rolling To-Do tile + alarm AE screen are unchanged
+  - VERIFIED on device (SM-A326B, live API, adb-driven after Nick unlocked):
+    tile → landed on "Saturday 18 July" + Today marker + live data matching the
+    API. Forward swipe held the hard edge (today IS the plan's last day); 5 back
+    swipes reached "Monday 13 July" and a 6th stayed there (back edge holds).
+    Monday screenshot: muted but clearly legible, markdown bold rendered, no raw
+    asterisks. WiFi+data off, cold relaunch → "Saved copy — Alfred unreachable"
+    over the cached week, still anchored on today, swipes still work, no crash.
+    Connectivity restored; Rolling To-Do tile confirmed unchanged (chalkboard-only
+    Today screen, live items). Alarm AE screen untouched by the diff (today-only
+    endpoint; no code change) — next real Stage 2 run exercises it as usual.
+    NOTE mid-week landing (today with pages on BOTH sides) couldn't be shown on a
+    Saturday; the anchor logic is unit-tested and worth a glance next week
