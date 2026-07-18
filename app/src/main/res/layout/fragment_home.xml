@@ -108,14 +108,6 @@
             android:textAppearance="?attr/textAppearanceBodyLarge"
             tools:text="This week: 4/5 days" />
 
-        <!-- Alfred at a glance, any time — nothing to do with the alarm running -->
-        <Button
-            android:id="@+id/btn_open_today"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/home_open_today" />
-
         <!-- TODO(temporary): dev tools for exercising the alarm/countdown/nuclear flow -->
         <TextView
             android:layout_width="wrap_content"

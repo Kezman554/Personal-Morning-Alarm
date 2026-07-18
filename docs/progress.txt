@@ -956,3 +956,20 @@
     time (16:19:29), AlarmReceiver -> AlarmService foreground, stream set to saved volume
     (audible), and the real 6:00 alarm re-armed for tomorrow (alarmTime=360, ok=true).
     Nick completed the full Stage 1 -> Stage 2 dismissal by hand — worked perfectly
+
+2026-07-18  Removed the "Today (schedule & to-do)" button from the Alarm tab
+  - The alarm tab's on-demand Today button (Card AG) is redundant now that Daily
+    Schedule and Rolling To-Do are separate Home tiles. Removed: btn_open_today from
+    fragment_home.xml, its click handler in HomeFragment (+ the now-unused
+    findNavController import), the action_home_to_today nav action, and the
+    home_open_today string
+  - CONFIRMED the Home tiles do NOT depend on the button: each tile navigates via its
+    own action_tiles_to_today to TodayFragment with ARG_SECTION=SCHEDULE/CHALKBOARD,
+    and TodayFragment pulls its data straight from AlfredRepository (the Alfred API)
+    via TodayViewModel — no coupling to HomeFragment or the removed button
+  - KEPT: TodayFragment, TodayViewModel, ScheduleRenderer/ChalkboardRenderer, and the
+    TodaySection.BOTH value — BOTH is now only the defensive fallback for a missing/
+    unknown section arg (comment updated to say so), not a reachable screen
+  - assembleDebug + testDebugUnitTest green. NOT yet installed on the A32 (device not
+    connected at commit time) — install to confirm the button is gone and both tiles
+    still open their feeds

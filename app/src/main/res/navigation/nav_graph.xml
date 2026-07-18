@@ -21,14 +21,10 @@
         android:id="@+id/homeFragment"
         android:name="com.personalmorningalarm.ui.HomeFragment"
         android:label="@string/title_alarm"
-        tools:layout="@layout/fragment_home">
-        <action
-            android:id="@+id/action_home_to_today"
-            app:destination="@id/todayFragment" />
-    </fragment>
+        tools:layout="@layout/fragment_home" />
 
-    <!-- One destination, narrowed by TodayFragment.ARG_SECTION: the tiles open a
-         single feed each, the Alarm page's button opens both. -->
+    <!-- One destination, narrowed by TodayFragment.ARG_SECTION: each home tile opens
+         a single feed. -->
     <fragment
         android:id="@+id/todayFragment"
         android:name="com.personalmorningalarm.ui.TodayFragment"

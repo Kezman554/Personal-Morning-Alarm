@@ -82,7 +82,6 @@
     <string name="today_screen_title">Today</string>
     <string name="today_schedule_section">Today\'s Schedule</string>
     <string name="today_chalkboard_section">Rolling To-Do</string>
-    <string name="home_open_today">Today (schedule &amp; to-do)</string>
 
     <!-- Home tile grid -->
     <string name="tile_daily_schedule">Daily Schedule</string>

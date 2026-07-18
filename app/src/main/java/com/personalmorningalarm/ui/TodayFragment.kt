@@ -73,7 +73,7 @@ class TodayFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // A tile opens a single feed; the Alarm page's button opens both.
+        // A tile opens a single feed; BOTH is only the fallback for a missing/unknown arg.
         binding.sectionSchedule.isVisible = section != TodaySection.CHALKBOARD
         binding.sectionChalkboard.isVisible = section != TodaySection.SCHEDULE
         binding.sectionDivider.isVisible = section == TodaySection.BOTH
