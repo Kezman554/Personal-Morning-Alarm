@@ -23,6 +23,7 @@ import com.personalmorningalarm.data.model.RollingTodoItem
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.remote.AlfredRepository
 import com.personalmorningalarm.data.remote.AlfredResult
+import com.personalmorningalarm.data.remote.ChalkboardSync
 import com.personalmorningalarm.databinding.FragmentTodayBinding
 import kotlinx.coroutines.launch
 
@@ -44,9 +45,10 @@ enum class TodaySection {
  *
  * Outside the alarm entirely — no NFC gate, no dismiss timer. The schedule is a
  * glance surface; the rolling to-do is read-write: tap ticks, long-press (with a
- * confirm) drops, and the field below adds. Writes only while the list came from
- * a live fetch — on cache fallback the list stays readable and the controls go
- * quiet. The alarm-flow content screen keeps [ChalkboardRenderer] and stays
+ * confirm) drops, and the field below adds. Writes are accepted anywhere: live
+ * they go straight to Alfred, and away from home they queue on-device
+ * ([ChalkboardSync]) and show as snapshot + pending edits until a flush lands
+ * them. The alarm-flow content screen keeps [ChalkboardRenderer] and stays
  * strictly read-only; it reminds during wake-up, it never edits.
  *
  * [ARG_SECTION] narrows it to a single feed, which is how the home tiles open it:
@@ -60,7 +62,10 @@ class TodayFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: TodayViewModel by viewModels {
-        AlfredViewModelFactory(AlfredRepository(requireContext()))
+        AlfredViewModelFactory(
+            AlfredRepository(requireContext()),
+            ChalkboardSync.getInstance(requireContext())
+        )
     }
 
     private val section: TodaySection by lazy {
@@ -95,6 +100,9 @@ class TodayFragment : Fragment() {
 
         binding.rvChalkboard.layoutManager = LinearLayoutManager(requireContext())
         binding.rvChalkboard.adapter = todoAdapter
+        // Writes are offered everywhere now — offline they queue rather than send.
+        todoAdapter.writable = true
+        binding.btnChalkboardConflictDismiss.setOnClickListener { viewModel.dismissFailed() }
         binding.btnChalkboardAdd.setOnClickListener { submitAdd() }
         binding.etChalkboardAdd.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
@@ -138,7 +146,7 @@ class TodayFragment : Fragment() {
     private fun showEvent(event: TodayViewModel.TodayEvent) {
         val message = when (event) {
             TodayViewModel.TodayEvent.LIST_REFRESHED -> R.string.chalkboard_list_refreshed
-            TodayViewModel.TodayEvent.WRITE_FAILED -> R.string.chalkboard_write_failed
+            TodayViewModel.TodayEvent.SAVED_OFFLINE -> R.string.chalkboard_saved_offline
         }
         Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
     }
@@ -146,7 +154,7 @@ class TodayFragment : Fragment() {
     private fun render(state: TodayViewModel.TodayState) {
         binding.swipeRefresh.isRefreshing = state.loading
         renderSchedule(state.schedule)
-        renderChalkboard(state.chalkboard)
+        renderChalkboard(state)
     }
 
     private fun renderSchedule(result: AlfredResult<List<ScheduleTaskDto>>?) {
@@ -167,32 +175,59 @@ class TodayFragment : Fragment() {
         }
     }
 
-    private fun renderChalkboard(result: AlfredResult<List<ChalkboardTaskDto>>?) {
-        // Writes need the live list — a cached copy's targeting lines may be days
-        // old. Disabled, not hidden: the quiet state the stale note explains.
-        val writable = result is AlfredResult.Fresh
-        todoAdapter.writable = writable
-        binding.tilChalkboardAdd.isEnabled = writable
-        binding.btnChalkboardAdd.isEnabled = writable
-        binding.tilChalkboardAdd.hint =
-            getString(if (writable) R.string.chalkboard_add_hint else R.string.chalkboard_read_only_hint)
+    private fun renderChalkboard(state: TodayViewModel.TodayState) {
+        val result = state.chalkboard
+        val queued = state.pending.filterNot { it.failed }
+        val failed = state.pending.filter { it.failed }
 
-        val tasks = sectionData(
-            result = result,
-            note = binding.tvChalkboardNote,
-            body = binding.tvChalkboardBody,
-            staleText = R.string.chalkboard_stale,
-            loadingText = R.string.chalkboard_loading,
-            unavailableText = R.string.chalkboard_unavailable
+        // The queued-count line and the conflict notice: the honest rendering of
+        // "what you see isn't all in the vault yet / didn't all make it".
+        binding.tvChalkboardPending.isVisible = queued.isNotEmpty()
+        if (queued.isNotEmpty()) {
+            binding.tvChalkboardPending.text = resources.getQuantityString(
+                R.plurals.chalkboard_pending_count, queued.size, queued.size
+            )
+        }
+        binding.rowChalkboardConflict.isVisible = failed.isNotEmpty()
+        if (failed.isNotEmpty()) {
+            binding.tvChalkboardConflict.text = resources.getQuantityString(
+                R.plurals.chalkboard_conflict_notice, failed.size, failed.size
+            ) + failed.joinToString(separator = "") { "\n• ${it.text}" }
+        }
+
+        // Writes are accepted everywhere; the hint says where they're going.
+        // Only a first load with the outcome still unknown keeps the plain hint.
+        binding.tilChalkboardAdd.hint = getString(
+            if (result is AlfredResult.Stale || result is AlfredResult.Unavailable) {
+                R.string.chalkboard_offline_hint
+            } else {
+                R.string.chalkboard_add_hint
+            }
         )
-        if (tasks == null) {
+
+        binding.tvChalkboardNote.visibility = View.GONE
+        val base: List<ChalkboardTaskDto>? = when (result) {
+            null -> null
+            is AlfredResult.Fresh -> result.data
+            is AlfredResult.Stale -> {
+                binding.tvChalkboardNote.visibility = View.VISIBLE
+                binding.tvChalkboardNote.text = getString(R.string.chalkboard_stale)
+                result.data
+            }
+            AlfredResult.Unavailable -> null
+        }
+
+        // No snapshot AND nothing queued: only then is there truly nothing to list.
+        if (base == null && queued.isEmpty()) {
             binding.tvChalkboardBody.isVisible = true
             binding.rvChalkboard.isVisible = false
+            binding.tvChalkboardBody.text =
+                getString(if (result == null) R.string.chalkboard_loading else R.string.chalkboard_unavailable)
             todoAdapter.submitList(emptyList())
             return
         }
 
-        val items = RollingTodo.items(tasks)
+        val items = RollingTodo.merged(base.orEmpty(), state.pending)
         binding.rvChalkboard.isVisible = items.isNotEmpty()
         binding.tvChalkboardBody.isVisible = items.isEmpty()
         if (items.isEmpty()) {

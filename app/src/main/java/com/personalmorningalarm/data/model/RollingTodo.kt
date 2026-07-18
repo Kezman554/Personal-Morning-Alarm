@@ -1,5 +1,7 @@
 package com.personalmorningalarm.data.model
 
+import com.personalmorningalarm.data.entity.ChalkboardVerb
+import com.personalmorningalarm.data.entity.PendingChalkboardWrite
 import com.personalmorningalarm.util.VaultText
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -14,7 +16,9 @@ data class RollingTodoItem(
     /** Raw vault line — the targeting key for tick/drop. Null on pre-line cached data. */
     val line: String? = null,
     /** Ticked in the vault, awaiting the overnight sweep. Shown struck through, not hidden. */
-    val done: Boolean = false
+    val done: Boolean = false,
+    /** Waiting in the offline queue — captured on the phone, not yet in the vault. */
+    val pending: Boolean = false
 )
 
 /**
@@ -44,6 +48,32 @@ object RollingTodo {
                     done = it.line != null && TICKED.containsMatchIn(it.line)
                 )
             }
+
+    /**
+     * The list as the user should see it: the last-known server list with their
+     * queued edits laid over the top — adds appended, ticks flipped, drops gone —
+     * each marked [RollingTodoItem.pending] so the not-yet-synced state is honest.
+     * Failed entries are excluded: they're a notice, not part of the list.
+     */
+    fun merged(tasks: List<ChalkboardTaskDto>, pending: List<PendingChalkboardWrite>): List<RollingTodoItem> {
+        var result = items(tasks)
+        pending.filterNot { it.failed }.forEach { write ->
+            result = when (ChalkboardVerb.fromName(write.verb)) {
+                ChalkboardVerb.ADD -> result + RollingTodoItem(
+                    task = VaultText.stripWikiLinks(write.text),
+                    date = null,
+                    line = null,
+                    pending = true
+                )
+                ChalkboardVerb.TICK -> result.map {
+                    if (it.line == write.line) it.copy(done = true, pending = true) else it
+                }
+                ChalkboardVerb.DROP -> result.filterNot { it.line == write.line }
+                null -> result
+            }
+        }
+        return result
+    }
 
     /**
      * ISO dates render as "8 Apr 2026". A date in any other shape is passed

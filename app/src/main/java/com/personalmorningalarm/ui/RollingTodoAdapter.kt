@@ -17,10 +17,11 @@ import com.personalmorningalarm.util.VaultText
  * "no longer relevant" shouldn't be fat-fingerable (the fragment adds a confirm
  * on top).
  *
- * Rows are only interactive while [writable] (chalkboard fetched live) and when
- * the item carries its targeting [RollingTodoItem.line]. Ticked items stay
- * listed, struck through, until the Pi's overnight sweep removes them — the
- * alarm-flow screen keeps its own read-only renderer and never uses this.
+ * Rows are interactive while [writable] and when the item carries its targeting
+ * [RollingTodoItem.line] — offline, the fragment's writes queue rather than
+ * send, so writable now stays on. Ticked items stay listed, struck through,
+ * until the Pi's overnight sweep removes them — the alarm-flow screen keeps its
+ * own read-only renderer and never uses this.
  */
 class RollingTodoAdapter(
     private val onTick: (RollingTodoItem) -> Unit,
@@ -55,6 +56,7 @@ class RollingTodoAdapter(
             }
             binding.tvTodoDate.isVisible = item.date != null
             binding.tvTodoDate.text = item.date
+            binding.tvTodoPending.isVisible = item.pending
             binding.root.alpha = if (item.done) DONE_ALPHA else 1f
 
             // A ticked item has had its verb — only drop remains for it.

@@ -12,6 +12,7 @@ import com.personalmorningalarm.data.dao.AlarmEventDao
 import com.personalmorningalarm.data.dao.BundledQuoteDao
 import com.personalmorningalarm.data.dao.ContentToggleDao
 import com.personalmorningalarm.data.dao.NfcTagDao
+import com.personalmorningalarm.data.dao.PendingChalkboardWriteDao
 import com.personalmorningalarm.data.dao.StretchExerciseDao
 import com.personalmorningalarm.data.dao.StretchRoutineDao
 import com.personalmorningalarm.data.entity.AlarmConfig
@@ -19,6 +20,7 @@ import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.BundledQuote
 import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
+import com.personalmorningalarm.data.entity.PendingChalkboardWrite
 import com.personalmorningalarm.data.entity.StretchExercise
 import com.personalmorningalarm.data.entity.StretchRoutine
 
@@ -30,9 +32,10 @@ import com.personalmorningalarm.data.entity.StretchRoutine
         ContentToggle::class,
         BundledQuote::class,
         StretchRoutine::class,
-        StretchExercise::class
+        StretchExercise::class,
+        PendingChalkboardWrite::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -45,6 +48,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun bundledQuoteDao(): BundledQuoteDao
     abstract fun stretchRoutineDao(): StretchRoutineDao
     abstract fun stretchExerciseDao(): StretchExerciseDao
+    abstract fun pendingChalkboardWriteDao(): PendingChalkboardWriteDao
 
     companion object {
         private const val DB_NAME = "personal_morning_alarm.db"
@@ -110,6 +114,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v6: offline store-and-forward queue for rolling to-do writes.
+        // Non-destructive; CREATE copied verbatim from the exported 6.json.
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pending_chalkboard_writes` " +
+                        "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `verb` TEXT NOT NULL, " +
+                        "`text` TEXT NOT NULL, `line` TEXT, `createdAt` INTEGER NOT NULL, " +
+                        "`failed` INTEGER NOT NULL)"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -119,7 +136,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     DB_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build().also { INSTANCE = it }
             }
         }

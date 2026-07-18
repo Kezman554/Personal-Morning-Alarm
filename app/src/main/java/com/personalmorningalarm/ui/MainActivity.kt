@@ -1,14 +1,18 @@
 package com.personalmorningalarm.ui
 
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.getSystemService
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
+import com.personalmorningalarm.data.remote.ChalkboardSync
 import com.personalmorningalarm.databinding.ActivityMainBinding
 import com.personalmorningalarm.util.AlarmScheduler
 import com.personalmorningalarm.util.BatteryOptimisationHelper
@@ -51,12 +55,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Flushes queued offline to-do writes when a network comes up while the app
+     * is in the foreground — the "walked back into home WiFi with the app open"
+     * case. Registered onStart, gone onStop: event-driven only, no background
+     * polling — this is capture, not live sync, and battery beats seconds.
+     */
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            flushChalkboardQueue("network available")
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         // Re-checked on every launch, not once: the grant can vanish under the app
         // (a reinstall resets it, and the user can revoke it in system settings),
         // and the failure is silent — the alarm sounds with no dismissal screen.
         ensureNotificationsEnabled()
+
+        // App-foreground flush trigger, plus the network-change trigger for as
+        // long as we stay foregrounded.
+        flushChalkboardQueue("app foreground")
+        getSystemService<ConnectivityManager>()?.registerDefaultNetworkCallback(networkCallback)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(networkCallback)
+        } catch (e: IllegalArgumentException) {
+            // Never registered (getSystemService returned null in onStart) — fine.
+        }
+    }
+
+    /**
+     * Best-effort, quiet: delivery is logged, conflicts are kept as failed queue
+     * rows that the Today screen surfaces with the item text — so a flush that
+     * happens while the user is elsewhere in the app still tells them later.
+     */
+    private fun flushChalkboardQueue(trigger: String) {
+        val appContext = applicationContext
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val sync = ChalkboardSync.getInstance(appContext)
+                if (!sync.hasPending()) return@launch
+                val outcome = sync.flush()
+                Log.d(
+                    TAG,
+                    "Chalkboard queue flush ($trigger): ${outcome.delivered} delivered, " +
+                        "${outcome.conflicted} conflicted, ${outcome.remaining} remaining"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Chalkboard queue flush failed ($trigger)", e)
+            }
+        }
     }
 
     private fun ensureNotificationsEnabled() {

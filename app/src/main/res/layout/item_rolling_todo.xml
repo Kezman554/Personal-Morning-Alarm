@@ -45,6 +45,18 @@
             android:textColor="?attr/colorOnSurfaceVariant"
             tools:text="5 Jul 2026" />
 
+        <!-- Only on items still waiting in the offline queue. -->
+        <TextView
+            android:id="@+id/tv_todo_pending"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/chalkboard_item_pending"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="italic"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
     </LinearLayout>
 
 </LinearLayout>

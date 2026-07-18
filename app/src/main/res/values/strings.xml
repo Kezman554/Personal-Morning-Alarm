@@ -83,11 +83,22 @@
     <string name="chalkboard_add_hint">Add to the list</string>
     <string name="chalkboard_add_action">Add</string>
     <string name="chalkboard_read_only_hint">Alfred unreachable</string>
+    <string name="chalkboard_offline_hint">Add to the list (offline — will sync)</string>
+    <string name="chalkboard_item_pending">Waiting to sync</string>
+    <string name="chalkboard_saved_offline">Saved on the phone — will sync when Alfred is reachable</string>
+    <string name="chalkboard_conflict_dismiss">Dismiss</string>
+    <plurals name="chalkboard_pending_count">
+        <item quantity="one">%d change waiting to sync</item>
+        <item quantity="other">%d changes waiting to sync</item>
+    </plurals>
+    <plurals name="chalkboard_conflict_notice">
+        <item quantity="one">%d change couldn\'t sync — the list had moved on:</item>
+        <item quantity="other">%d changes couldn\'t sync — the list had moved on:</item>
+    </plurals>
     <string name="chalkboard_drop_title">Drop this item?</string>
     <string name="chalkboard_drop_message">“%1$s” will be removed as no longer relevant. To mark it done instead, tap it.</string>
     <string name="chalkboard_drop_confirm">Drop</string>
     <string name="chalkboard_list_refreshed">The list had changed on Alfred — refreshed</string>
-    <string name="chalkboard_write_failed">Alfred didn\'t take the change — list restored</string>
 
     <string name="week_schedule_title">Daily Schedule</string>
     <string name="week_no_plan">No plan this week yet</string>

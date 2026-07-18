@@ -1056,3 +1056,54 @@
     endpoint; no code change) — next real Stage 2 run exercises it as usual.
     NOTE mid-week landing (today with pages on BOTH sides) couldn't be shown on a
     Saturday; the anchor logic is unit-tested and worth a glance next week
+
+2026-07-18  Offline store-and-forward for rolling to-do writes
+  - Writes (add/tick/drop) are now accepted anywhere: live they go straight to
+    Alfred exactly as before (queue untouched — test-pinned); offline they land
+    in a Room-backed FIFO queue and the screen renders snapshot + queued edits
+    with per-item "Waiting to sync" markers and an "N changes waiting to sync"
+    count. App-side only; the API is unchanged
+  - DATA: pending_chalkboard_writes (id AUTOINCREMENT = FIFO order, verb TEXT,
+    text, line, createdAt, failed). Migration v5->v6, CREATE copied verbatim from
+    the exported 6.json. Verb stored as text with a null-returning lookup, so an
+    unknown verb (downgrade) is failed-not-fatal — same lesson as the 16 Jul
+    ContentType fix
+  - ChalkboardSync (singleton; data/remote): enqueue + mutex-guarded flush so the
+    triggers can't double-replay. Replay per entry, in order: Done -> delete;
+    404/stale -> mark FAILED, keep for the notice, never retry, rest continue;
+    Unreachable -> stop, everything left stays. Failed rows persist until the
+    user dismisses the notice, so a flush that happens while they're elsewhere
+    still tells them later, with the item's text
+  - TRIGGERS (event-driven only, no polling): MainActivity onStart (app
+    foreground) + a ConnectivityManager default-network callback registered
+    onStart/onStop, plus a flush before every manual refresh in TodayViewModel.
+    A cheap hasPending() guard keeps empty-queue triggers off the network
+  - Direct write that finds Alfred just gone (was Fresh, WiFi dropped) also
+    falls back to the queue — capture, never lose. SAVED_OFFLINE snackbar
+    replaces the old WRITE_FAILED restore path
+  - FOUND ON DEVICE: after a background flush the delivered entries left the
+    queue while the open screen still showed the stale snapshot — items visibly
+    vanished until a manual refresh. ChalkboardSync now emits flush outcomes;
+    TodayViewModel reconciles on any flush that changed something. Verified live:
+    reconnect with the screen open -> queued add became a real row in place
+  - FOUND VIA FLAKY TEST: reconcileChalkboard() read _state.value (copy receiver)
+    BEFORE suspending on the fetch, so a queue-flow update landing mid-fetch got
+    rolled back. Pre-existing shape, exposed by the new concurrent flush path.
+    Fetch-then-copy now; suite stable across repeated full runs
+  - TESTS: 168 green — ChalkboardSyncTest (FIFO replay, stop-on-unreachable,
+    partial flush, stale-target fail-and-continue, unknown verb, dismiss),
+    RollingTodo.merged (adds/ticks/drops over the snapshot, failed excluded,
+    capture order, no-snapshot adds), TodayViewModel queue paths (offline
+    enqueue, online bypass, fallback-to-queue, refresh-flush, background-flush
+    reconcile)
+  - VERIFIED on device (SM-A326B, live API, adb-driven): migration clean; online
+    add -> vault, no queue involvement; offline (wifi+data off): two adds + a
+    tick all shown with markers + count, survived force-stop + relaunch;
+    reconnect -> network-callback flush delivered 3 in order (vault confirmed via
+    GET), the first callback fired before connectivity settled and correctly
+    stopped with everything still queued (stop-on-unreachable exercised live);
+    stale-key: dropped the tick's target line from the dev box before
+    reconnecting -> queued tick 404'd, kept as the persistent "1 change couldn't
+    sync — the list had moved on: • <item>" notice while the other entries still
+    landed; Dismiss cleared it. Test items dropped from the vault after; the
+    ticked online-test line goes with tonight's sweep

@@ -5,11 +5,23 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+import com.personalmorningalarm.data.entity.ChalkboardVerb
+import com.personalmorningalarm.data.entity.PendingChalkboardWrite
+
 /** Turning Alfred's /chalkboard array into display-ready items. */
 class RollingTodoTest {
 
     private fun task(task: String?, date: String? = null, line: String? = null) =
         ChalkboardTaskDto(task, date, line)
+
+    private fun pending(
+        verb: ChalkboardVerb,
+        text: String,
+        line: String? = null,
+        failed: Boolean = false
+    ) = PendingChalkboardWrite(
+        verb = verb.name, text = text, line = line, createdAt = 0L, failed = failed
+    )
 
     @Test
     fun `keeps API order`() {
@@ -104,5 +116,90 @@ class RollingTodoTest {
 
         assertNull(item.line)
         assertEquals(false, item.done)
+    }
+
+    // --- merged: the snapshot with the offline queue's edits laid over it ---
+
+    private val fenceLine = "- [ ] Fix fence"
+    private val snapshot = listOf(
+        task("Fix fence", line = fenceLine),
+        task("Plant the bamboo", line = "- [ ] Plant the bamboo")
+    )
+
+    @Test
+    fun `a queued add appends a pending item`() {
+        val items = RollingTodo.merged(snapshot, listOf(pending(ChalkboardVerb.ADD, "Buy stamps")))
+
+        assertEquals(3, items.size)
+        val added = items.last()
+        assertEquals("Buy stamps", added.task)
+        assertTrue(added.pending)
+        assertNull(added.line)
+    }
+
+    @Test
+    fun `a queued tick flips its item, marked pending`() {
+        val items = RollingTodo.merged(
+            snapshot, listOf(pending(ChalkboardVerb.TICK, "Fix fence", fenceLine))
+        )
+
+        val ticked = items.single { it.task == "Fix fence" }
+        assertTrue(ticked.done)
+        assertTrue(ticked.pending)
+        assertEquals(false, items.single { it.task == "Plant the bamboo" }.done)
+    }
+
+    @Test
+    fun `a queued drop removes its item`() {
+        val items = RollingTodo.merged(
+            snapshot, listOf(pending(ChalkboardVerb.DROP, "Fix fence", fenceLine))
+        )
+
+        assertEquals(listOf("Plant the bamboo"), items.map { it.task })
+    }
+
+    @Test
+    fun `queued edits apply in capture order`() {
+        val items = RollingTodo.merged(
+            snapshot,
+            listOf(
+                pending(ChalkboardVerb.ADD, "Buy stamps"),
+                pending(ChalkboardVerb.TICK, "Fix fence", fenceLine),
+                pending(ChalkboardVerb.DROP, "Plant the bamboo", "- [ ] Plant the bamboo")
+            )
+        )
+
+        assertEquals(listOf("Fix fence", "Buy stamps"), items.map { it.task })
+        assertTrue(items.single { it.task == "Fix fence" }.done)
+    }
+
+    @Test
+    fun `failed entries are a notice, not part of the list`() {
+        val items = RollingTodo.merged(
+            snapshot,
+            listOf(
+                pending(ChalkboardVerb.DROP, "Fix fence", fenceLine, failed = true),
+                pending(ChalkboardVerb.ADD, "Buy stamps", failed = true)
+            )
+        )
+
+        assertEquals(listOf("Fix fence", "Plant the bamboo"), items.map { it.task })
+    }
+
+    @Test
+    fun `an unknown queued verb is ignored by the merge`() {
+        val unknown = PendingChalkboardWrite(
+            verb = "TELEPORT", text = "From a newer build", line = null, createdAt = 0L
+        )
+
+        assertEquals(2, RollingTodo.merged(snapshot, listOf(unknown)).size)
+    }
+
+    @Test
+    fun `with no snapshot at all, queued adds still make a list`() {
+        val items = RollingTodo.merged(emptyList(), listOf(pending(ChalkboardVerb.ADD, "Buy stamps")))
+
+        assertEquals(listOf("Buy stamps"), items.map { it.task })
+        assertTrue(items.single().pending)
     }
 }

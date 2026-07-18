@@ -2,6 +2,7 @@ package com.personalmorningalarm.ui
 
 import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
+import com.personalmorningalarm.data.entity.ChalkboardVerb
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
@@ -12,11 +13,13 @@ import com.personalmorningalarm.data.remote.AlfredResult
 import com.personalmorningalarm.data.remote.AlfredSettings
 import com.personalmorningalarm.data.remote.ChalkboardAddRequest
 import com.personalmorningalarm.data.remote.ChalkboardLineRequest
+import com.personalmorningalarm.data.remote.ChalkboardSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
 import okhttp3.ResponseBody
 import org.junit.After
@@ -96,6 +99,9 @@ class TodayViewModelTest : ViewModelTestSupport() {
         throw AssertionError("Event $expected never arrived; saw $events")
     }
 
+    // The offline queue on the harness's in-memory Room, so persistence is exercised too.
+    private val sync by lazy { ChalkboardSync(alfred, db.pendingChalkboardWriteDao()) }
+
     @After
     fun tearDownEvents() {
         eventScope.cancel()
@@ -103,7 +109,7 @@ class TodayViewModelTest : ViewModelTestSupport() {
 
     /** A ViewModel that has finished its initial load. */
     private fun loadedViewModel(): TodayViewModel {
-        val vm = TodayViewModel(alfred)
+        val vm = TodayViewModel(alfred, sync)
         keepSubscribed(vm.state)
         awaitValue(vm.state) { !it.loading && it.schedule != null }
         return vm
@@ -272,7 +278,7 @@ class TodayViewModelTest : ViewModelTestSupport() {
     }
 
     @Test
-    fun `a write Alfred never received restores the cached list and says so`() {
+    fun `a write Alfred never received is queued, not lost, over the cached list`() {
         val vm = writableViewModel(listOf(fence))
 
         // Alfred vanishes between the fetch and the tap.
@@ -280,10 +286,104 @@ class TodayViewModelTest : ViewModelTestSupport() {
         chalkboardResponse = null
         vm.tickItem(fenceLine)
 
-        // The optimistic flip is undone by the reconciling refetch, which now
-        // serves the cached pre-write list — stale, so writes disable.
-        val state = awaitValue(vm.state) { it.chalkboard is AlfredResult.Stale }
+        // The optimistic flip is undone by the reconciling refetch (the cached
+        // pre-write list) — and the tick sits in the queue, where the merged
+        // rendering re-applies it.
+        val state = awaitValue(vm.state) {
+            it.chalkboard is AlfredResult.Stale && it.pending.size == 1
+        }
         assertEquals(listOf(fence), (state.chalkboard as AlfredResult.Stale).data)
-        awaitEvent(TodayViewModel.TodayEvent.WRITE_FAILED)
+        assertEquals(ChalkboardVerb.TICK.name, state.pending.single().verb)
+        assertEquals(fenceLine, state.pending.single().line)
+        awaitEvent(TodayViewModel.TodayEvent.SAVED_OFFLINE)
+    }
+
+    // --- the offline queue ---
+
+    /** A ViewModel whose chalkboard is a cached (stale) copy — the offline state. */
+    private fun offlineViewModel(items: List<ChalkboardTaskDto>): TodayViewModel {
+        scheduleResponse = schedule
+        chalkboardResponse = items
+        val vm = loadedViewModel() // fills the cache
+        scheduleResponse = null
+        chalkboardResponse = null
+        vm.refresh()
+        awaitValue(vm.state) { it.chalkboard is AlfredResult.Stale }
+        trackEvents(vm)
+        writesSeen = 0
+        return vm
+    }
+
+    @Test
+    fun `offline writes go to the queue without touching the network`() {
+        val vm = offlineViewModel(listOf(fence))
+
+        vm.addItem("Buy stamps")
+        vm.tickItem(fenceLine)
+
+        val state = awaitValue(vm.state) { it.pending.size == 2 }
+        assertEquals(0, writesSeen)
+        assertEquals(
+            listOf(ChalkboardVerb.ADD.name, ChalkboardVerb.TICK.name),
+            state.pending.map { it.verb }
+        )
+        // The tick queues the item's text, so a conflict notice can name it.
+        assertEquals("Fix fence", state.pending[1].text)
+        awaitEvent(TodayViewModel.TodayEvent.SAVED_OFFLINE)
+    }
+
+    @Test
+    fun `online writes never touch the queue`() {
+        val vm = writableViewModel(chalkboard)
+        writeResponse = { Response.success(Unit) }
+        chalkboardResponse = chalkboard + fence
+
+        vm.addItem("Fix fence")
+
+        awaitValue(vm.state) { (it.chalkboard as? AlfredResult.Fresh)?.data == chalkboard + fence }
+        assertEquals(1, writesSeen)
+        assertTrue(vm.state.value.pending.isEmpty())
+    }
+
+    @Test
+    fun `a flush triggered outside the screen still reconciles the open list`() {
+        val vm = offlineViewModel(listOf(fence))
+        vm.addItem("Buy stamps")
+        awaitValue(vm.state) { it.pending.size == 1 }
+
+        // Alfred comes back and something else — MainActivity's network-change
+        // trigger — runs the flush, not this screen.
+        val delivered = listOf(fence, ChalkboardTaskDto("Buy stamps", null, "- [ ] Buy stamps"))
+        writeResponse = { Response.success(Unit) }
+        scheduleResponse = schedule
+        chalkboardResponse = delivered
+        runBlocking { sync.flush() }
+
+        // The delivered item must reappear as a real fetched row, not vanish
+        // with its queue entry.
+        val state = awaitValue(vm.state) {
+            it.pending.isEmpty() && (it.chalkboard as? AlfredResult.Fresh)?.data == delivered
+        }
+        assertTrue(state.chalkboard is AlfredResult.Fresh)
+    }
+
+    @Test
+    fun `refresh flushes the queue before refetching, so the list lands reconciled`() {
+        val vm = offlineViewModel(listOf(fence))
+        vm.addItem("Buy stamps")
+        awaitValue(vm.state) { it.pending.size == 1 }
+
+        // Home WiFi: Alfred is back, holding the delivered item.
+        val delivered = listOf(fence, ChalkboardTaskDto("Buy stamps", null, "- [ ] Buy stamps"))
+        writeResponse = { Response.success(Unit) }
+        scheduleResponse = schedule
+        chalkboardResponse = delivered
+        vm.refresh()
+
+        val state = awaitValue(vm.state) {
+            it.pending.isEmpty() && (it.chalkboard as? AlfredResult.Fresh)?.data == delivered
+        }
+        assertEquals(1, writesSeen)
+        assertTrue(state.chalkboard is AlfredResult.Fresh)
     }
 }
