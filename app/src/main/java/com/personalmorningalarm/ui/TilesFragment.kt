@@ -43,6 +43,9 @@ class TilesFragment : Fragment() {
         liveTile(binding.tileRollingTodo, R.string.tile_rolling_todo) {
             openToday(TodaySection.CHALKBOARD)
         }
+        liveTile(binding.tileShoppingLists, R.string.tile_shopping_lists) {
+            findNavController().navigate(R.id.action_tiles_to_shoppingMenu)
+        }
 
         comingSoonTile(binding.tileKitchenSync, R.string.tile_kitchen_sync)
         comingSoonTile(binding.tileKanban, R.string.tile_kanban)

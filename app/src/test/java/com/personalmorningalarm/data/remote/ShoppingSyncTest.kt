@@ -4,11 +4,13 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
 import com.personalmorningalarm.data.AppDatabase
-import com.personalmorningalarm.data.dao.PendingChalkboardWriteDao
-import com.personalmorningalarm.data.entity.ChalkboardVerb
-import com.personalmorningalarm.data.entity.PendingChalkboardWrite
+import com.personalmorningalarm.data.dao.PendingShoppingWriteDao
+import com.personalmorningalarm.data.entity.PendingShoppingWrite
+import com.personalmorningalarm.data.entity.ShoppingVerb
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.ShoppingItemDto
+import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -25,21 +27,21 @@ import retrofit2.Response
 import java.io.IOException
 
 /**
- * The offline queue's replay contract: FIFO, delivered entries leave, a stale
- * target is failed (kept for the notice) without blocking the rest, and an
- * unreachable Alfred stops the flush with everything left still queued.
+ * The shopping queue's replay contract — mirrors [ChalkboardSyncTest] — plus the
+ * one thing that's new here: entries carry a [PendingShoppingWrite.listId] and
+ * replay must dispatch each to its own list's endpoint.
  */
 @RunWith(RobolectricTestRunner::class)
-class ChalkboardSyncTest {
+class ShoppingSyncTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.app.Application>()
 
     private val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
         .allowMainThreadQueries()
         .build()
-    private val dao = db.pendingChalkboardWriteDao()
+    private val dao = db.pendingShoppingWriteDao()
 
-    /** Every write the fake Alfred saw, in order — "ADD:text" / "TICK:line" / "DROP:line". */
+    /** Every write the fake Alfred saw, in order — "list:ADD:text" / "list:TICK:line" / "list:DROP:line". */
     private val writesSeen = mutableListOf<String>()
 
     /** Per-write behaviour, consumed in order; missing entries mean "unreachable". */
@@ -53,34 +55,24 @@ class ChalkboardSyncTest {
                 override suspend fun getDailySchedule(): List<ScheduleTaskDto> = throw IOException()
                 override suspend fun getWeekSchedule(): WeekScheduleDto = throw IOException()
                 override suspend fun getChalkboard(): List<ChalkboardTaskDto> = throw IOException()
+                override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> = throw IOException()
+                override suspend fun tickChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = throw IOException()
+                override suspend fun dropChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = throw IOException()
 
-                override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> =
-                    write("ADD:${body.text}")
-
-                override suspend fun tickChalkboardItem(body: ChalkboardLineRequest): Response<Unit> =
-                    write("TICK:${body.line}")
-
-                override suspend fun dropChalkboardItem(body: ChalkboardLineRequest): Response<Unit> =
-                    write("DROP:${body.line}")
-
-                override suspend fun getShoppingLists(): List<com.personalmorningalarm.data.model.ShoppingListSummaryDto> =
-                    throw IOException()
-
+                override suspend fun getShoppingLists(): List<ShoppingListSummaryDto> = throw IOException()
                 override suspend fun getShoppingList(listId: String): com.personalmorningalarm.data.model.ShoppingListDetailDto =
                     throw IOException()
-
-                override suspend fun createShoppingList(
-                    body: ShoppingCreateRequest
-                ): Response<com.personalmorningalarm.data.model.ShoppingListSummaryDto> = throw IOException()
+                override suspend fun createShoppingList(body: ShoppingCreateRequest): Response<ShoppingListSummaryDto> =
+                    throw IOException()
 
                 override suspend fun addShoppingItem(listId: String, body: ShoppingAddRequest): Response<Unit> =
-                    throw IOException()
+                    write("$listId:ADD:${body.text}")
 
                 override suspend fun tickShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
-                    throw IOException()
+                    write("$listId:TICK:${body.line}")
 
                 override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
-                    throw IOException()
+                    write("$listId:DROP:${body.line}")
 
                 private fun write(label: String): Response<Unit> {
                     writesSeen += label
@@ -91,12 +83,15 @@ class ChalkboardSyncTest {
         }
     )
 
-    private val sync = ChalkboardSync(repository, dao)
+    private val sync = ShoppingSync(repository, dao)
+
+    private val fitness = "6-life/shopping/fitness.md"
+    private val fashion = "6-life/shopping/fashion.md"
 
     private fun accept() = { Response.success(Unit) }
 
     private fun staleTarget(): () -> Response<Unit> = {
-        val body = """{"detail":{"error":"item not found","items":${Gson().toJson(emptyList<ChalkboardTaskDto>())}}}"""
+        val body = """{"detail":{"error":"item not found","list_id":"$fitness","items":${Gson().toJson(emptyList<ShoppingItemDto>())}}}"""
         Response.error(404, ResponseBody.create(MediaType.parse("application/json"), body))
     }
 
@@ -106,16 +101,16 @@ class ChalkboardSyncTest {
     }
 
     @Test
-    fun `flush replays the queue in capture order and empties it`() = runBlocking {
-        sync.enqueue(ChalkboardVerb.ADD, "Buy stamps")
-        sync.enqueue(ChalkboardVerb.TICK, "Fix fence", "- [ ] Fix fence")
-        sync.enqueue(ChalkboardVerb.DROP, "Old idea", "- [ ] Old idea")
+    fun `flush replays the queue in capture order across lists and empties it`() = runBlocking {
+        sync.enqueue(fitness, ShoppingVerb.ADD, "Dip bars")
+        sync.enqueue(fashion, ShoppingVerb.TICK, "Scarf", "- [ ] Scarf")
+        sync.enqueue(fitness, ShoppingVerb.DROP, "Old idea", "- [ ] Old idea")
         repeat(3) { responses += accept() }
 
         val outcome = sync.flush()
 
         assertEquals(
-            listOf("ADD:Buy stamps", "TICK:- [ ] Fix fence", "DROP:- [ ] Old idea"),
+            listOf("$fitness:ADD:Dip bars", "$fashion:TICK:- [ ] Scarf", "$fitness:DROP:- [ ] Old idea"),
             writesSeen
         )
         assertEquals(3, outcome.delivered)
@@ -125,41 +120,21 @@ class ChalkboardSyncTest {
 
     @Test
     fun `an unreachable Alfred stops the flush and keeps everything queued`() = runBlocking {
-        sync.enqueue(ChalkboardVerb.ADD, "Buy stamps")
-        sync.enqueue(ChalkboardVerb.ADD, "Call the dentist")
-        // No responses queued: the first write throws.
+        sync.enqueue(fitness, ShoppingVerb.ADD, "Dip bars")
+        sync.enqueue(fashion, ShoppingVerb.ADD, "Scarf")
 
         val outcome = sync.flush()
 
         assertEquals(0, outcome.delivered)
         assertEquals(2, outcome.remaining)
-        // Only the first entry was attempted — no pointless hammering after a miss.
         assertEquals(1, writesSeen.size)
         assertTrue(sync.hasPending())
     }
 
     @Test
-    fun `a partial flush keeps only what Alfred didn't take`() = runBlocking {
-        sync.enqueue(ChalkboardVerb.ADD, "Buy stamps")
-        sync.enqueue(ChalkboardVerb.ADD, "Call the dentist")
-        responses += accept() // first lands, then Alfred vanishes
-
-        val outcome = sync.flush()
-
-        assertEquals(1, outcome.delivered)
-        assertEquals(1, outcome.remaining)
-        // The survivor is the undelivered entry, still replayable next flush.
-        responses += accept()
-        val second = sync.flush()
-        assertEquals(1, second.delivered)
-        assertEquals(listOf("ADD:Buy stamps", "ADD:Call the dentist", "ADD:Call the dentist"), writesSeen)
-        assertFalse(sync.hasPending())
-    }
-
-    @Test
     fun `a stale target is failed and kept, and never blocks the rest of the queue`() = runBlocking {
-        sync.enqueue(ChalkboardVerb.TICK, "Long gone", "- [ ] Long gone")
-        sync.enqueue(ChalkboardVerb.ADD, "Buy stamps")
+        sync.enqueue(fitness, ShoppingVerb.TICK, "Long gone", "- [ ] Long gone")
+        sync.enqueue(fashion, ShoppingVerb.ADD, "Scarf")
         responses += staleTarget()
         responses += accept()
 
@@ -168,51 +143,47 @@ class ChalkboardSyncTest {
         assertEquals(1, outcome.delivered)
         assertEquals(1, outcome.conflicted)
         assertEquals(0, outcome.remaining)
-        // The failed entry is out of the replay set but kept for the notice…
         assertFalse(sync.hasPending())
         val kept = dao.observeAllOnce()
         assertEquals(1, kept.size)
         assertTrue(kept.single().failed)
-        assertEquals("Long gone", kept.single().text)
-        // …and a re-flush never retries it.
-        writesSeen.clear()
-        sync.flush()
-        assertTrue(writesSeen.isEmpty())
+        assertEquals(fitness, kept.single().listId)
     }
 
     @Test
-    fun `dismissing failed entries clears the notice`() = runBlocking {
-        sync.enqueue(ChalkboardVerb.TICK, "Long gone", "- [ ] Long gone")
+    fun `dismissing failed entries clears only that list's notice`() = runBlocking {
+        sync.enqueue(fitness, ShoppingVerb.TICK, "Long gone", "- [ ] Long gone")
+        sync.enqueue(fashion, ShoppingVerb.TICK, "Also gone", "- [ ] Also gone")
+        responses += staleTarget()
         responses += staleTarget()
         sync.flush()
-        assertEquals(1, dao.observeAllOnce().size)
+        assertEquals(2, dao.observeAllOnce().size)
 
-        sync.dismissFailed()
+        sync.dismissFailed(fitness)
 
-        assertTrue(dao.observeAllOnce().isEmpty())
+        val remaining = dao.observeAllOnce()
+        assertEquals(1, remaining.size)
+        assertEquals(fashion, remaining.single().listId)
     }
 
     @Test
     fun `an entry with an unknown verb is failed, not fatal, and the rest continue`() = runBlocking {
         dao.insert(
-            PendingChalkboardWrite(
-                verb = "TELEPORT",
-                text = "From a newer build",
-                line = null,
-                createdAt = 0L
+            PendingShoppingWrite(
+                listId = fitness, verb = "TELEPORT", text = "From a newer build", line = null, createdAt = 0L
             )
         )
-        sync.enqueue(ChalkboardVerb.ADD, "Buy stamps")
+        sync.enqueue(fitness, ShoppingVerb.ADD, "Dip bars")
         responses += accept()
 
         val outcome = sync.flush()
 
         assertEquals(1, outcome.delivered)
         assertEquals(1, outcome.conflicted)
-        assertEquals(listOf("ADD:Buy stamps"), writesSeen)
+        assertEquals(listOf("$fitness:ADD:Dip bars"), writesSeen)
     }
 }
 
 /** One-shot read of the full table, for asserting on kept/failed rows. */
-private suspend fun PendingChalkboardWriteDao.observeAllOnce(): List<PendingChalkboardWrite> =
+private suspend fun PendingShoppingWriteDao.observeAllOnce(): List<PendingShoppingWrite> =
     observeAll().first()

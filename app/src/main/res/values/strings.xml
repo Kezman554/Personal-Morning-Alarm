@@ -100,6 +100,26 @@
     <string name="chalkboard_drop_confirm">Drop</string>
     <string name="chalkboard_list_refreshed">The list had changed on Alfred — refreshed</string>
 
+    <!-- Shopping Lists tile (Alfred /shopping) -->
+    <string name="shopping_menu_title">Shopping Lists</string>
+    <string name="shopping_menu_loading">Checking with Alfred…</string>
+    <string name="shopping_menu_unavailable">Shopping lists unavailable</string>
+    <string name="shopping_menu_empty">No shopping lists yet</string>
+    <string name="shopping_new_list_heading">New list</string>
+    <string name="shopping_new_list_hint">List name</string>
+    <string name="shopping_new_list_action">Create</string>
+    <string name="shopping_new_list_needs_alfred">Creating a list needs Alfred — try again on home WiFi</string>
+    <string name="shopping_new_list_created">“%1$s” created</string>
+    <string name="shopping_new_list_conflict">That list already exists</string>
+    <string name="shopping_list_item_count">%1$d left of %2$d</string>
+
+    <string name="shopping_list_unavailable">List unavailable</string>
+    <string name="shopping_list_empty">Nothing on this list — all clear</string>
+    <string name="shopping_add_hint">Add to the list</string>
+    <string name="shopping_offline_hint">Add to the list (offline — will sync)</string>
+    <string name="shopping_drop_title">Drop this item?</string>
+    <string name="shopping_drop_message">“%1$s” will be removed as no longer wanted. To mark it bought instead, tap it.</string>
+
     <string name="week_schedule_title">Daily Schedule</string>
     <string name="week_no_plan">No plan this week yet</string>
     <string name="week_day_empty">No plan for this day</string>
@@ -112,6 +132,7 @@
     <!-- Home tile grid -->
     <string name="tile_daily_schedule">Daily Schedule</string>
     <string name="tile_rolling_todo">Rolling To-Do</string>
+    <string name="tile_shopping_lists">Shopping Lists</string>
     <string name="tile_kitchen_sync">KitchenSync</string>
     <string name="tile_kanban">Kanban</string>
     <string name="tile_coming_soon">Coming soon</string>

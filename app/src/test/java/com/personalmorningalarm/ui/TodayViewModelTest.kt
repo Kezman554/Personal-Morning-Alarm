@@ -14,6 +14,9 @@ import com.personalmorningalarm.data.remote.AlfredSettings
 import com.personalmorningalarm.data.remote.ChalkboardAddRequest
 import com.personalmorningalarm.data.remote.ChalkboardLineRequest
 import com.personalmorningalarm.data.remote.ChalkboardSync
+import com.personalmorningalarm.data.remote.ShoppingAddRequest
+import com.personalmorningalarm.data.remote.ShoppingCreateRequest
+import com.personalmorningalarm.data.remote.ShoppingLineRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -71,6 +74,26 @@ class TodayViewModelTest : ViewModelTestSupport() {
                     override suspend fun tickChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
 
                     override suspend fun dropChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
+
+                    override suspend fun getShoppingLists(): List<com.personalmorningalarm.data.model.ShoppingListSummaryDto> =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun getShoppingList(listId: String): com.personalmorningalarm.data.model.ShoppingListDetailDto =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun createShoppingList(
+                        body: ShoppingCreateRequest
+                    ): Response<com.personalmorningalarm.data.model.ShoppingListSummaryDto> =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun addShoppingItem(listId: String, body: ShoppingAddRequest): Response<Unit> =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun tickShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
+                        throw IOException("Alfred unreachable")
 
                     private fun write(): Response<Unit> {
                         writesSeen++

@@ -4,6 +4,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.ShoppingItemDto
+import com.personalmorningalarm.data.model.ShoppingListDetailDto
+import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
@@ -32,7 +35,11 @@ class AlfredRepositoryTest {
         response: List<ScheduleTaskDto>? = null,
         chalkboardResponse: List<ChalkboardTaskDto>? = null,
         weekResponse: WeekScheduleDto? = null,
-        writeResponse: (() -> Response<Unit>)? = null
+        writeResponse: (() -> Response<Unit>)? = null,
+        shoppingListsResponse: List<ShoppingListSummaryDto>? = null,
+        shoppingListResponse: ShoppingListDetailDto? = null,
+        createShoppingListResponse: (() -> Response<ShoppingListSummaryDto>)? = null,
+        shoppingWriteResponse: (() -> Response<Unit>)? = null
     ) = AlfredRepository(
         settings,
         cache,
@@ -53,8 +60,29 @@ class AlfredRepositoryTest {
 
                 override suspend fun dropChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
 
+                override suspend fun getShoppingLists(): List<ShoppingListSummaryDto> =
+                    shoppingListsResponse ?: throw IOException("Alfred unreachable")
+
+                override suspend fun getShoppingList(listId: String): ShoppingListDetailDto =
+                    shoppingListResponse ?: throw IOException("Alfred unreachable")
+
+                override suspend fun createShoppingList(body: ShoppingCreateRequest): Response<ShoppingListSummaryDto> =
+                    createShoppingListResponse?.invoke() ?: throw IOException("Alfred unreachable")
+
+                override suspend fun addShoppingItem(listId: String, body: ShoppingAddRequest): Response<Unit> =
+                    shoppingWrite()
+
+                override suspend fun tickShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
+                    shoppingWrite()
+
+                override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
+                    shoppingWrite()
+
                 private fun write(): Response<Unit> =
                     writeResponse?.invoke() ?: throw IOException("Alfred unreachable")
+
+                private fun shoppingWrite(): Response<Unit> =
+                    shoppingWriteResponse?.invoke() ?: throw IOException("Alfred unreachable")
             }
         }
     )
@@ -241,5 +269,126 @@ class AlfredRepositoryTest {
         assertEquals(AlfredResult.Unavailable, repository(null).getDailySchedule())
         // Dropped, so it can't be retried forever.
         assertEquals(null, cache.get(AlfredRepository.ENDPOINT_DAILY_SCHEDULE))
+    }
+
+    // --- /shopping discovery + per-list get: same fetch(), independent cache keys per list ---
+
+    private val fitnessId = "6-life/shopping/fitness.md"
+    private val lists = listOf(
+        ShoppingListSummaryDto(fitnessId, "Fitness Equipment", 2, 2),
+        ShoppingListSummaryDto("6-life/shopping/fashion.md", "Fashion", 0, 0)
+    )
+    private val fitnessDetail = ShoppingListDetailDto(
+        list = lists[0],
+        items = listOf(ShoppingItemDto("Dip bars", "- [ ] Dip bars", false))
+    )
+
+    @Test
+    fun `shopping discovery returns fresh data from a reachable Alfred`() = runBlocking {
+        val result = repository(shoppingListsResponse = lists).getShoppingLists()
+
+        assertTrue(result is AlfredResult.Fresh)
+        assertEquals(lists, (result as AlfredResult.Fresh).data)
+    }
+
+    @Test
+    fun `shopping discovery falls back to the last successful response`() = runBlocking {
+        repository(shoppingListsResponse = lists).getShoppingLists()
+
+        val result = repository().getShoppingLists()
+
+        assertTrue(result is AlfredResult.Stale)
+        assertEquals(lists, (result as AlfredResult.Stale).data)
+    }
+
+    @Test
+    fun `one shopping list's cache is independent of another's and of discovery`() = runBlocking {
+        repository(shoppingListResponse = fitnessDetail).getShoppingList(fitnessId)
+
+        // Discovery and a different list id must not see the fitness cache.
+        assertEquals(AlfredResult.Unavailable, repository().getShoppingLists())
+        assertEquals(AlfredResult.Unavailable, repository().getShoppingList("6-life/shopping/fashion.md"))
+
+        val stale = repository().getShoppingList(fitnessId)
+        assertEquals(fitnessDetail, (stale as AlfredResult.Stale).data)
+    }
+
+    // --- create-list: online-only, its own result type ---
+
+    @Test
+    fun `creating a list reports the created summary`() = runBlocking {
+        val repo = repository(createShoppingListResponse = { Response.success(lists[0]) })
+
+        val result = repo.createShoppingList("Fitness Equipment")
+
+        assertEquals(lists[0], (result as ShoppingCreateResult.Created).list)
+    }
+
+    @Test
+    fun `a 409 reports a conflict, not an exception`() = runBlocking {
+        val repo = repository(
+            createShoppingListResponse = { Response.error(409, jsonBody("""{"detail":"already exists"}""")) }
+        )
+
+        assertEquals(ShoppingCreateResult.Conflict, repo.createShoppingList("Fitness Equipment"))
+    }
+
+    @Test
+    fun `create against an unreachable Alfred fails quietly, not an exception`() = runBlocking {
+        assertEquals(ShoppingCreateResult.Unreachable, repository().createShoppingList("New List"))
+    }
+
+    // --- shopping writes: same shape as chalkboard's, scoped per list ---
+
+    private fun shoppingStaleTargetBody(list: List<ShoppingItemDto>): ResponseBody =
+        jsonBody("""{"detail":{"error":"item not found","list_id":"$fitnessId","items":${gson.toJson(list)}}}""")
+
+    @Test
+    fun `a landed shopping write reports done`() = runBlocking {
+        val repo = repository(shoppingWriteResponse = { Response.success(Unit) })
+
+        assertEquals(ShoppingWriteResult.Done, repo.addShoppingItem(fitnessId, "Dip bars"))
+        assertEquals(ShoppingWriteResult.Done, repo.tickShoppingItem(fitnessId, "- [ ] Dip bars"))
+        assertEquals(ShoppingWriteResult.Done, repo.dropShoppingItem(fitnessId, "- [ ] Dip bars"))
+    }
+
+    @Test
+    fun `a shopping write against an unreachable Alfred fails quietly`() = runBlocking {
+        assertEquals(ShoppingWriteResult.Unreachable, repository().tickShoppingItem(fitnessId, "- [ ] Dip bars"))
+    }
+
+    @Test
+    fun `a stale shopping target returns the current items and refreshes that list's cache`() = runBlocking {
+        val current = listOf(ShoppingItemDto("Dip bars", "- [ ] Dip bars", false))
+        val repo = repository(shoppingWriteResponse = { Response.error(404, shoppingStaleTargetBody(current)) })
+
+        val result = repo.tickShoppingItem(fitnessId, "- [ ] Long gone")
+
+        assertEquals(current, (result as ShoppingWriteResult.StaleTarget).current)
+        val stale = repository().getShoppingList(fitnessId)
+        assertEquals(current, (stale as AlfredResult.Stale).data.items)
+    }
+
+    @Test
+    fun `a stale shopping target preserves the previously cached list summary`() = runBlocking {
+        // Populate the cache with a full detail (list + items) first…
+        repository(shoppingListResponse = fitnessDetail).getShoppingList(fitnessId)
+        val current = listOf(ShoppingItemDto("Dip bars", "- [ ] Dip bars", true))
+        val repo = repository(shoppingWriteResponse = { Response.error(404, shoppingStaleTargetBody(current)) })
+
+        repo.tickShoppingItem(fitnessId, "- [ ] Long gone")
+
+        // …the 404 body carries only items, so the cache write must carry the
+        // previous summary forward rather than dropping it.
+        val stale = repository().getShoppingList(fitnessId) as AlfredResult.Stale
+        assertEquals(lists[0], stale.data.list)
+        assertEquals(current, stale.data.items)
+    }
+
+    @Test
+    fun `a shopping 404 without a usable items body is just a failed write`() = runBlocking {
+        val repo = repository(shoppingWriteResponse = { Response.error(404, jsonBody("{not json")) })
+
+        assertEquals(ShoppingWriteResult.Unreachable, repo.dropShoppingItem(fitnessId, "- [ ] Dip bars"))
     }
 }

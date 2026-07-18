@@ -2,11 +2,15 @@ package com.personalmorningalarm.data.remote
 
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.ShoppingItemDto
+import com.personalmorningalarm.data.model.ShoppingListDetailDto
+import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 /**
  * The Alfred Vault API. One endpoint per content screen that reads from Alfred;
@@ -49,6 +53,39 @@ interface AlfredApiService {
     /** Removes the targeted item as no longer relevant (the API archives it as dropped). */
     @POST("chalkboard/drop")
     suspend fun dropChalkboardItem(@Body body: ChalkboardLineRequest): Response<Unit>
+
+    /** Every active shopping list in the vault — the list-picker menu's discovery source. */
+    @GET("shopping")
+    suspend fun getShoppingLists(): List<ShoppingListSummaryDto>
+
+    /** One list's items, ticked included; each carries its raw targeting [ShoppingItemDto.line]. */
+    @GET("shopping/{listId}")
+    suspend fun getShoppingList(@Path("listId") listId: String): ShoppingListDetailDto
+
+    /** Scaffolds a new active shopping list. 409 (via [Response]) if that name already exists. */
+    @POST("shopping")
+    suspend fun createShoppingList(@Body body: ShoppingCreateRequest): Response<ShoppingListSummaryDto>
+
+    /** Appends an unticked item to the targeted list. */
+    @POST("shopping/{listId}")
+    suspend fun addShoppingItem(
+        @Path("listId") listId: String,
+        @Body body: ShoppingAddRequest
+    ): Response<Unit>
+
+    /** Flips the targeted item to bought. It stays listed, ticked, until the sweep. */
+    @POST("shopping/{listId}/tick")
+    suspend fun tickShoppingItem(
+        @Path("listId") listId: String,
+        @Body body: ShoppingLineRequest
+    ): Response<Unit>
+
+    /** Removes the targeted item as no longer wanted (the API archives it as dropped). */
+    @POST("shopping/{listId}/drop")
+    suspend fun dropShoppingItem(
+        @Path("listId") listId: String,
+        @Body body: ShoppingLineRequest
+    ): Response<Unit>
 }
 
 /** Body for POST /chalkboard — the task text alone; Alfred adds the checkbox and date. */
@@ -56,3 +93,12 @@ data class ChalkboardAddRequest(val text: String)
 
 /** Body for tick/drop — the item's raw vault line, sent back verbatim as the target. */
 data class ChalkboardLineRequest(val line: String)
+
+/** Body for POST /shopping/{listId} — the item text alone; Alfred adds the checkbox. */
+data class ShoppingAddRequest(val text: String)
+
+/** Body for a shopping tick/drop — the item's raw vault line, sent back verbatim as the target. */
+data class ShoppingLineRequest(val line: String)
+
+/** Body for POST /shopping — the list's display name; Alfred slugifies it into a vault file id. */
+data class ShoppingCreateRequest(val name: String)

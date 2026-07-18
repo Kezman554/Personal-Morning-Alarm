@@ -13,6 +13,7 @@ import androidx.navigation.ui.setupWithNavController
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.remote.ChalkboardSync
+import com.personalmorningalarm.data.remote.ShoppingSync
 import com.personalmorningalarm.databinding.ActivityMainBinding
 import com.personalmorningalarm.util.AlarmScheduler
 import com.personalmorningalarm.util.BatteryOptimisationHelper
@@ -56,14 +57,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Flushes queued offline to-do writes when a network comes up while the app
-     * is in the foreground — the "walked back into home WiFi with the app open"
+     * Flushes queued offline to-do/shopping writes when a network comes up while the
+     * app is in the foreground — the "walked back into home WiFi with the app open"
      * case. Registered onStart, gone onStop: event-driven only, no background
      * polling — this is capture, not live sync, and battery beats seconds.
      */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             flushChalkboardQueue("network available")
+            flushShoppingQueue("network available")
         }
     }
 
@@ -77,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         // App-foreground flush trigger, plus the network-change trigger for as
         // long as we stay foregrounded.
         flushChalkboardQueue("app foreground")
+        flushShoppingQueue("app foreground")
         getSystemService<ConnectivityManager>()?.registerDefaultNetworkCallback(networkCallback)
     }
 
@@ -108,6 +111,25 @@ class MainActivity : AppCompatActivity() {
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Chalkboard queue flush failed ($trigger)", e)
+            }
+        }
+    }
+
+    /** Same trigger shape as [flushChalkboardQueue], for the shopping-list queue. */
+    private fun flushShoppingQueue(trigger: String) {
+        val appContext = applicationContext
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val sync = ShoppingSync.getInstance(appContext)
+                if (!sync.hasPending()) return@launch
+                val outcome = sync.flush()
+                Log.d(
+                    TAG,
+                    "Shopping queue flush ($trigger): ${outcome.delivered} delivered, " +
+                        "${outcome.conflicted} conflicted, ${outcome.remaining} remaining"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Shopping queue flush failed ($trigger)", e)
             }
         }
     }

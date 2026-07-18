@@ -17,6 +17,9 @@
         <action
             android:id="@+id/action_tiles_to_week"
             app:destination="@id/weekScheduleFragment" />
+        <action
+            android:id="@+id/action_tiles_to_shoppingMenu"
+            app:destination="@id/shoppingMenuFragment" />
     </fragment>
 
     <!-- The Daily Schedule tile: the whole plan week, one page per day. -->
@@ -43,6 +46,30 @@
         <argument
             android:name="section"
             android:defaultValue="BOTH"
+            app:argType="string" />
+    </fragment>
+
+    <!-- Shopping Lists tile: discovery menu + create, then one screen per list. -->
+    <fragment
+        android:id="@+id/shoppingMenuFragment"
+        android:name="com.personalmorningalarm.ui.ShoppingMenuFragment"
+        android:label="@string/shopping_menu_title"
+        tools:layout="@layout/fragment_shopping_menu">
+        <action
+            android:id="@+id/action_shoppingMenu_to_shoppingList"
+            app:destination="@id/shoppingListFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/shoppingListFragment"
+        android:name="com.personalmorningalarm.ui.ShoppingListFragment"
+        android:label="@string/shopping_menu_title"
+        tools:layout="@layout/fragment_shopping_list">
+        <argument
+            android:name="listId"
+            app:argType="string" />
+        <argument
+            android:name="listTitle"
             app:argType="string" />
     </fragment>
 

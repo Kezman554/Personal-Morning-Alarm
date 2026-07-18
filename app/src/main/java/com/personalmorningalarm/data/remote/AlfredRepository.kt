@@ -6,6 +6,9 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.ShoppingItemDto
+import com.personalmorningalarm.data.model.ShoppingListDetailDto
+import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +70,64 @@ class AlfredRepository(
     suspend fun dropChalkboardItem(line: String): AlfredWriteResult =
         write("drop") { it.dropChalkboardItem(ChalkboardLineRequest(line)) }
 
+    /** Every active shopping list from Alfred, falling back to the last one it served. */
+    suspend fun getShoppingLists(): AlfredResult<List<ShoppingListSummaryDto>> =
+        fetch(
+            endpoint = ENDPOINT_SHOPPING,
+            type = object : TypeToken<List<ShoppingListSummaryDto>>() {}.type
+        ) { it.getShoppingLists() }
+
+    /** One shopping list's items from Alfred, falling back to the last copy served for [listId]. */
+    suspend fun getShoppingList(listId: String): AlfredResult<ShoppingListDetailDto> =
+        fetch(
+            endpoint = shoppingListEndpoint(listId),
+            type = ShoppingListDetailDto::class.java
+        ) { it.getShoppingList(listId) }
+
+    /**
+     * Scaffolds a new shopping list. Online-only by design (the card's contract): a
+     * queued create can't know whether the name collides until it actually reaches
+     * Alfred, so there is nothing sensible to do with it offline.
+     */
+    suspend fun createShoppingList(name: String): ShoppingCreateResult = withContext(Dispatchers.IO) {
+        try {
+            val response = serviceProvider(settings).createShoppingList(ShoppingCreateRequest(name))
+            when {
+                response.isSuccessful -> {
+                    val body = response.body()
+                    if (body == null) {
+                        Log.w(TAG, "Create shopping list: 2xx with no body")
+                        ShoppingCreateResult.Unreachable
+                    } else {
+                        ShoppingCreateResult.Created(body)
+                    }
+                }
+                response.code() == 409 -> ShoppingCreateResult.Conflict
+                else -> {
+                    Log.w(TAG, "Create shopping list rejected: HTTP ${response.code()}")
+                    ShoppingCreateResult.Unreachable
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            Log.d(TAG, "Alfred unreachable for create shopping list (${e.javaClass.simpleName})")
+            ShoppingCreateResult.Unreachable
+        }
+    }
+
+    /** Adds an item to the shopping list [listId]. Alfred appends the checkbox. */
+    suspend fun addShoppingItem(listId: String, text: String): ShoppingWriteResult =
+        writeShopping(listId, "add") { it.addShoppingItem(listId, ShoppingAddRequest(text)) }
+
+    /** Ticks the item whose raw vault line is [line] in list [listId]. Stays listed until the sweep. */
+    suspend fun tickShoppingItem(listId: String, line: String): ShoppingWriteResult =
+        writeShopping(listId, "tick") { it.tickShoppingItem(listId, ShoppingLineRequest(line)) }
+
+    /** Drops the item whose raw vault line is [line] in list [listId] — no longer wanted. */
+    suspend fun dropShoppingItem(listId: String, line: String): ShoppingWriteResult =
+        writeShopping(listId, "drop") { it.dropShoppingItem(listId, ShoppingLineRequest(line)) }
+
     /**
      * Runs a chalkboard write. A 404 means the targeting line went stale; its body
      * carries the current list, which is cached (it is the freshest state we have)
@@ -116,6 +177,61 @@ class AlfredRepository(
         return AlfredWriteResult.StaleTarget(current)
     }
 
+    /** Same shape as [write], for the per-list shopping endpoints. */
+    private suspend fun writeShopping(
+        listId: String,
+        verb: String,
+        request: suspend (AlfredApiService) -> Response<Unit>
+    ): ShoppingWriteResult = withContext(Dispatchers.IO) {
+        try {
+            val response = request(serviceProvider(settings))
+            when {
+                response.isSuccessful -> ShoppingWriteResult.Done
+                response.code() == 404 -> staleShoppingTarget(listId, verb, response)
+                else -> {
+                    Log.w(TAG, "Shopping $verb rejected: HTTP ${response.code()}")
+                    ShoppingWriteResult.Unreachable
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            Log.d(TAG, "Alfred unreachable for shopping $verb (${e.javaClass.simpleName})")
+            ShoppingWriteResult.Unreachable
+        }
+    }
+
+    /** Shape of a shopping tick/drop 404: {"detail":{"error":…,"list_id":…,"items":[…]}}. */
+    private data class ShoppingStaleTargetBody(val detail: Detail?) {
+        data class Detail(val items: List<ShoppingItemDto>?)
+    }
+
+    private fun staleShoppingTarget(listId: String, verb: String, response: Response<Unit>): ShoppingWriteResult {
+        val current: List<ShoppingItemDto>? = try {
+            gson.fromJson(response.errorBody()?.string(), ShoppingStaleTargetBody::class.java)
+                ?.detail?.items
+        } catch (e: Exception) {
+            null
+        }
+        if (current == null) {
+            Log.w(TAG, "Shopping $verb 404 without a usable list body")
+            return ShoppingWriteResult.Unreachable
+        }
+        Log.d(TAG, "Shopping $verb hit a stale line — resynced ${current.size} items")
+        // The 404 body has no list summary, only items — carry the previous cache's
+        // summary forward so this endpoint's cache stays the same shape (a full
+        // ShoppingListDetailDto) as every ordinary fetch caches under this key.
+        val previousList = try {
+            cache.get(shoppingListEndpoint(listId))
+                ?.let { gson.fromJson(it.json, ShoppingListDetailDto::class.java) }
+                ?.list
+        } catch (e: Exception) {
+            null
+        }
+        cache.put(shoppingListEndpoint(listId), gson.toJson(ShoppingListDetailDto(list = previousList, items = current)))
+        return ShoppingWriteResult.StaleTarget(current)
+    }
+
     /**
      * Calls [request], caching its response under [endpoint]. [type] is how the
      * cached JSON is read back, so it must match [request]'s return type.
@@ -159,8 +275,12 @@ class AlfredRepository(
         const val ENDPOINT_DAILY_SCHEDULE = "daily-schedule"
         const val ENDPOINT_WEEK_SCHEDULE = "daily-schedule/week"
         const val ENDPOINT_CHALKBOARD = "chalkboard"
+        const val ENDPOINT_SHOPPING = "shopping"
 
         private val CHALKBOARD_TYPE: Type =
             object : TypeToken<List<ChalkboardTaskDto>>() {}.type
+
+        /** Each list caches independently — a slash is a fine SharedPreferences key. */
+        fun shoppingListEndpoint(listId: String): String = "$ENDPOINT_SHOPPING/$listId"
     }
 }

@@ -1107,3 +1107,84 @@
     sync — the list had moved on: • <item>" notice while the other entries still
     landed; Dismiss cleared it. Test items dropped from the vault after; the
     ticked online-test line goes with tonight's sweep
+
+2026-07-18  Shopping Lists tile (Alfred /shopping)
+  - New home tile: a list-picker menu (discovery + create) then a per-list
+    add/tick/drop screen, reusing the rolling to-do's whole stack — service layer,
+    caching, optimistic writes, and the offline queue — rather than building a
+    parallel path
+  - API probed live before coding (per memory rule), and one probe went wrong:
+    testing create-list's 409 with a near-duplicate name ("Fitness Equipment" vs
+    the real "Fitness Equipment — Rolling Buy List") didn't collide — dedup is by
+    slugified id, not display title — so it created a REAL empty list in the vault
+    (6-life/shopping/fitness-equipment.md). No DELETE endpoint exists to undo it.
+    Told Nick immediately; his call was to leave it (harmless, empty) rather than
+    have me touch the vault further. Confirmed 409 DOES fire on an exact repeat of
+    that same name, body `{"detail":"shopping list already exists: <id>"}` (a
+    plain string, not the object shape chalkboard's stale-404 uses)
+  - Full contract: GET /shopping -> [{id,title,total,unticked}]; GET
+    /shopping/{id} -> {list,items:[{text,line,ticked}]}; POST /shopping/{id},
+    /shopping/{id}/tick, /shopping/{id}/drop take {text}/{line}/{line}; a stale
+    tick/drop 404s `{"detail":{"error","list_id","items"}}` (items only, no list
+    summary) for the same one-round-trip refresh chalkboard uses; POST /shopping
+    {name} -> 201 or 409, online-only per the card (a queued create can't know if
+    it'll collide until it actually reaches Alfred)
+  - Data: ShoppingListSummaryDto/ShoppingListDetailDto/ShoppingItemDto (data/model);
+    ShoppingList (pure items()/merged(), mirrors RollingTodo, no date field);
+    PendingShoppingWrite (+ListId) / PendingShoppingWriteDao, migration v6->v7 —
+    ONE shared FIFO outbox across every list, not one queue per list, so replay
+    order stays global while each entry dispatches to its own list's endpoint
+  - AlfredApiService/AlfredRepository gained 6 endpoints; ShoppingWriteResult /
+    ShoppingCreateResult mirror AlfredWriteResult but create is its own type (no
+    stale-target concept, nothing to merge back in). The stale-404 body carries
+    only items, so the cache write reconstructs a full ShoppingListDetailDto by
+    carrying the previous cached list-summary forward, keeping that endpoint's
+    cache the same shape everywhere it's written
+  - ShoppingSync mirrors ChalkboardSync exactly (same flush/mutex/singleton
+    shape); wired into MainActivity's existing foreground + network-change
+    triggers alongside the chalkboard flush. AlfredViewModelFactory untouched —
+    ShoppingListViewModel's 3-arg (repo, sync, listId) shape gets its own tiny
+    ShoppingListViewModelFactory rather than generalizing the shared one
+  - UI: TilesFragment grid regrouped to fit a 3rd live tile (Shopping Lists next
+    to KitchenSync; Kanban now alone with a spacer to stay half-width);
+    ShoppingMenuFragment (discovery + create, 409/offline handling) and
+    ShoppingListFragment (add/tap-to-tick/long-press-drop, wikilink + "~£cost"
+    rendering via the existing VaultText — no new markdown handling needed, `~`
+    isn't part of MarkdownRenderer's emphasis syntax)
+  - 200 unit tests green (was 168): ShoppingListTest (items/merged, mirrors
+    RollingTodoTest), ShoppingSyncTest (multi-list FIFO replay/stale/dismiss,
+    mirrors ChalkboardSyncTest), AlfredRepositoryTest shopping section (discovery,
+    per-list cache independence, create Created/Conflict/Unreachable, write
+    Done/StaleTarget/Unreachable, cache-shape preservation on stale). One
+    pre-existing flaky test (HomeViewModelTest, Dispatchers.Main race, unrelated)
+    reproduced and passed clean on rerun — not a regression
+  - VERIFIED on device (SM-A326B, adb-driven, home WiFi, once Nick reconnected
+    the phone mid-session): fresh install/relaunch clean, v6->v7 migration ran
+    with no crash, alarm re-armed normally through a force-stop. Tile grid shows
+    Shopping Lists live next to KitchenSync, Kanban alone on its own row. Menu
+    listed all 5 real vault lists with correct counts (including the stray
+    fitness-equipment.md from the probing mistake). On the real Fitness list:
+    added "DailySync shopping-test" -> confirmed via GET, ticked it (struck
+    through + greyed on screen, vault total/unticked updated), long-press ->
+    confirm dialog -> dropped -> vault back to its original 2 items. Create-list:
+    exact-duplicate name "Fitness Equipment" -> "That list already exists"
+    snackbar (no mutation); a genuinely new "DailySync Test List" -> 201,
+    appeared in the menu immediately without a manual refresh, opened correctly
+    empty. Offline: svc wifi disable (mobile data alone can't reach the LAN-only
+    Alfred, so this is a faithful "away from home" test) -> queued add showed
+    "Waiting to sync" + "1 change waiting to sync" + the offline-hint field label;
+    svc wifi enable -> MainActivity's network-callback trigger fired within ~40s,
+    logged "1 delivered, 0 conflicted, 0 remaining", vault confirmed via GET, and
+    the open screen reconciled in place (marker/note cleared without a manual
+    refresh) — same reconcile-on-flush fix proven on the rolling to-do now holds
+    for shopping lists too
+  - NOT exercised: create-list refusing offline outright (didn't disable WiFi
+    while the menu's new-list row was in focus) — the code path is identical to
+    every other online-only call here and the offline queue tests above cover
+    the unreachable branch, but a live "tap Create with WiFi off" run is still a
+    nice-to-have
+  - Left two harmless empty test artifacts in the vault, both labelled clearly:
+    fitness-equipment.md (from the probing mistake) and dailysync-test-list.md
+    (this session's create/offline test, its one item already dropped) — no
+    DELETE endpoint exists to remove the list files themselves; Nick's to tidy up
+    by hand if he wants them gone
