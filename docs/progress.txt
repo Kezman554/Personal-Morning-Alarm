@@ -1012,3 +1012,40 @@
     force-stop + relaunch; airplane mode shows the saved copy with write controls
     disabled, no crash. Two ticked "DailySync write-test" lines remain in the vault
     from probing - clearly labelled, tonight's sweep archives them
+
+2026-07-18  Week paging for the tile-opened Daily Schedule screen
+  - The Daily Schedule tile now opens a new WeekScheduleFragment: the whole plan
+    week (GET /daily-schedule/week), one swipeable ViewPager2 page per day,
+    anchored on today. The alarm-flow AE screen and the Today screen are untouched
+    and stay today-only on GET /daily-schedule (a wake-up reminder is not a browser)
+  - API probed live before coding (per memory rule): /daily-schedule/week returns
+    {week:"2026-W29", start, end, days:{iso-date:[{task,period}...]}} — the plan
+    week is Mon-Sat, 6 days, matching the today endpoint's item shape
+  - Data: WeekScheduleDto + pure WeekSchedule mapper (data/model). days() walks
+    start..end so unlisted days still get an (empty) page; a broken/absurd range
+    (>14 days, end<start, unparseable) falls back to the day keys that parse; an
+    empty/absent days map means "no plan this week" even if a range came along.
+    anchorIndex() = today, clamped to the plan's edges (stale cached week)
+  - Repository: getWeekSchedule() through the same fetch() — caching, stale
+    fallback and the host setting inherited unchanged. New cache key
+    "daily-schedule/week" (SharedPreferences, slash is fine); caches
+    independently of the today endpoint (test pins it)
+  - UI: WeekScheduleViewModel fetches ONCE per screen visit (ViewModel init);
+    swipes only bind pages, zero per-day network calls. Day header "EEEE d MMMM"
+    on every page + a colorPrimary "Today" marker on the current day; past days
+    alpha 0.55 — muted but legible (the use case is glancing back at what
+    yesterday held). First/last plan days are hard pager edges. Empty day →
+    "No plan for this day"; no plan → "No plan this week yet"; stale → the
+    existing "Saved copy — Alfred unreachable" note; unreachable+no cache →
+    "Schedule unavailable". Added androidx.viewpager2:viewpager2:1.1.0
+  - Tiles/nav: action_tiles_to_week + weekScheduleFragment destination; the
+    Rolling To-Do tile still opens TodayFragment(CHALKBOARD) unchanged
+  - Tests: WeekScheduleTest (range walk, explicit empty day, no-plan detection,
+    broken-range fallback, unparseable keys, anchor + clamp) + 3 repository week
+    tests; both fake AlfredApiServices gained the new method. 151 tests green;
+    assembleDebug clean; installDebug onto the A32 (update install, data kept)
+  - NOT YET VERIFIED ON DEVICE: the phone is PIN-locked and adb can't (and
+    shouldn't) get past it. Still to drive once unlocked: tile → lands on today
+    (Sat 18 Jul, the plan's LAST day, so the forward hard edge is today's page),
+    swipe back to Mon 13 muted-but-readable, airplane mode → cached week + stale
+    note, and eyeball that the Rolling To-Do tile + alarm AE screen are unchanged

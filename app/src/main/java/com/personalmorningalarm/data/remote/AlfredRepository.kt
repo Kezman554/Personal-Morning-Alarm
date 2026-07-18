@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +40,13 @@ class AlfredRepository(
             endpoint = ENDPOINT_DAILY_SCHEDULE,
             type = object : TypeToken<List<ScheduleTaskDto>>() {}.type
         ) { it.getDailySchedule() }
+
+    /** The whole plan week, falling back to the last one Alfred served. */
+    suspend fun getWeekSchedule(): AlfredResult<WeekScheduleDto> =
+        fetch(
+            endpoint = ENDPOINT_WEEK_SCHEDULE,
+            type = WeekScheduleDto::class.java
+        ) { it.getWeekSchedule() }
 
     /** The rolling to-do from Alfred, falling back to the last one it served. */
     suspend fun getChalkboard(): AlfredResult<List<ChalkboardTaskDto>> =
@@ -149,6 +157,7 @@ class AlfredRepository(
         private const val TAG = "PMA"
 
         const val ENDPOINT_DAILY_SCHEDULE = "daily-schedule"
+        const val ENDPOINT_WEEK_SCHEDULE = "daily-schedule/week"
         const val ENDPOINT_CHALKBOARD = "chalkboard"
 
         private val CHALKBOARD_TYPE: Type =

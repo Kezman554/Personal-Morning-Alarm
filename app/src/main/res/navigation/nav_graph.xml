@@ -14,7 +14,17 @@
         <action
             android:id="@+id/action_tiles_to_today"
             app:destination="@id/todayFragment" />
+        <action
+            android:id="@+id/action_tiles_to_week"
+            app:destination="@id/weekScheduleFragment" />
     </fragment>
+
+    <!-- The Daily Schedule tile: the whole plan week, one page per day. -->
+    <fragment
+        android:id="@+id/weekScheduleFragment"
+        android:name="com.personalmorningalarm.ui.WeekScheduleFragment"
+        android:label="@string/week_schedule_title"
+        tools:layout="@layout/fragment_week_schedule" />
 
     <!-- The alarm screen: what used to be Home. -->
     <fragment

@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
 import okhttp3.ResponseBody
@@ -30,6 +31,7 @@ class AlfredRepositoryTest {
     private fun repository(
         response: List<ScheduleTaskDto>? = null,
         chalkboardResponse: List<ChalkboardTaskDto>? = null,
+        weekResponse: WeekScheduleDto? = null,
         writeResponse: (() -> Response<Unit>)? = null
     ) = AlfredRepository(
         settings,
@@ -38,6 +40,9 @@ class AlfredRepositoryTest {
             object : AlfredApiService {
                 override suspend fun getDailySchedule(): List<ScheduleTaskDto> =
                     response ?: throw IOException("Alfred unreachable")
+
+                override suspend fun getWeekSchedule(): WeekScheduleDto =
+                    weekResponse ?: throw IOException("Alfred unreachable")
 
                 override suspend fun getChalkboard(): List<ChalkboardTaskDto> =
                     chalkboardResponse ?: throw IOException("Alfred unreachable")
@@ -134,6 +139,46 @@ class AlfredRepositoryTest {
         repository(chalkboardResponse = chalkboard).getChalkboard()
         val stale = repository().getDailySchedule()
         assertEquals(schedule, (stale as AlfredResult.Stale).data)
+    }
+
+    // --- /daily-schedule/week: same fetch(), same caching and fallback ---
+
+    private val week = WeekScheduleDto(
+        week = "2026-W29",
+        start = "2026-07-13",
+        end = "2026-07-14",
+        days = mapOf(
+            "2026-07-13" to listOf(ScheduleTaskDto("Gym", "am")),
+            "2026-07-14" to emptyList()
+        )
+    )
+
+    @Test
+    fun `week schedule returns fresh data from a reachable Alfred`() = runBlocking {
+        val result = repository(weekResponse = week).getWeekSchedule()
+
+        assertTrue(result is AlfredResult.Fresh)
+        assertEquals(week, (result as AlfredResult.Fresh).data)
+    }
+
+    @Test
+    fun `week schedule falls back to the last successful response`() = runBlocking {
+        repository(weekResponse = week).getWeekSchedule() // populates the cache
+
+        val result = repository().getWeekSchedule()
+
+        assertTrue(result is AlfredResult.Stale)
+        assertEquals(week, (result as AlfredResult.Stale).data)
+    }
+
+    @Test
+    fun `week schedule caches independently of the today endpoint`() = runBlocking {
+        repository(weekResponse = week).getWeekSchedule()
+
+        // A cached week must not answer a today request, and vice versa.
+        assertEquals(AlfredResult.Unavailable, repository().getDailySchedule())
+        repository(response = schedule).getDailySchedule()
+        assertEquals(week, (repository().getWeekSchedule() as AlfredResult.Stale).data)
     }
 
     // --- chalkboard writes: like the reads, nothing here may throw ---

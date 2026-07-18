@@ -58,6 +58,8 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     // Pull-to-refresh for the Today screen (also supplies its loading spinner)
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    // Day pager for the week schedule screen
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
     implementation 'androidx.activity:activity-ktx:1.9.3'
     implementation 'androidx.fragment:fragment-ktx:1.8.5'
 

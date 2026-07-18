@@ -89,6 +89,11 @@
     <string name="chalkboard_list_refreshed">The list had changed on Alfred — refreshed</string>
     <string name="chalkboard_write_failed">Alfred didn\'t take the change — list restored</string>
 
+    <string name="week_schedule_title">Daily Schedule</string>
+    <string name="week_no_plan">No plan this week yet</string>
+    <string name="week_day_empty">No plan for this day</string>
+    <string name="week_day_today">Today</string>
+
     <string name="today_screen_title">Today</string>
     <string name="today_schedule_section">Today\'s Schedule</string>
     <string name="today_chalkboard_section">Rolling To-Do</string>

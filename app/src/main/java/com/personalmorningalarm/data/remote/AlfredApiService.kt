@@ -2,6 +2,7 @@ package com.personalmorningalarm.data.remote
 
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.WeekScheduleDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -20,6 +21,14 @@ interface AlfredApiService {
     /** Today's schedule. No completion state and no timestamps — display only. */
     @GET("daily-schedule")
     suspend fun getDailySchedule(): List<ScheduleTaskDto>
+
+    /**
+     * The whole plan week, every day keyed by ISO date. Used only by the week
+     * screen — the alarm content screen and the Today screen stay on
+     * [getDailySchedule], which is all a wake-up reminder needs.
+     */
+    @GET("daily-schedule/week")
+    suspend fun getWeekSchedule(): WeekScheduleDto
 
     /**
      * The rolling to-do, including items ticked but not yet swept by the Pi's

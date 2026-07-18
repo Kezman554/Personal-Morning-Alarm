@@ -35,8 +35,10 @@ class TilesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // The schedule tile opens the week pager; the alarm content screen and
+        // the Today screen stay today-only.
         liveTile(binding.tileDailySchedule, R.string.tile_daily_schedule) {
-            openToday(TodaySection.SCHEDULE)
+            findNavController().navigate(R.id.action_tiles_to_week)
         }
         liveTile(binding.tileRollingTodo, R.string.tile_rolling_todo) {
             openToday(TodaySection.CHALKBOARD)

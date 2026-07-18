@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
+import com.personalmorningalarm.data.model.WeekScheduleDto
 import com.personalmorningalarm.data.remote.AlfredApiService
 import com.personalmorningalarm.data.remote.AlfredRepository
 import com.personalmorningalarm.data.remote.AlfredResponseCache
@@ -57,6 +58,10 @@ class TodayViewModelTest : ViewModelTestSupport() {
 
                     override suspend fun getChalkboard(): List<ChalkboardTaskDto> =
                         chalkboardResponse ?: throw IOException("Alfred unreachable")
+
+                    // The Today screen never asks for the week — see the week-screen tests.
+                    override suspend fun getWeekSchedule(): WeekScheduleDto =
+                        throw IOException("Alfred unreachable")
 
                     override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> = write()
 
