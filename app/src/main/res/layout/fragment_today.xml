@@ -6,7 +6,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <ScrollView
+    <!-- NestedScrollView, not ScrollView: a wrap_content RecyclerView inside a
+         plain ScrollView gets mis-measured and truncates the to-do list. -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true">
@@ -82,6 +84,8 @@
                     tools:text="Saved copy — Alfred unreachable"
                     tools:visibility="visible" />
 
+                <!-- Status messages only (loading / empty / unavailable); the list
+                     itself lives in the RecyclerView below. -->
                 <TextView
                     android:id="@+id/tv_chalkboard_body"
                     android:layout_width="match_parent"
@@ -89,12 +93,58 @@
                     android:layout_marginTop="8dp"
                     android:lineSpacingMultiplier="1.15"
                     android:textAppearance="?attr/textAppearanceBodyLarge"
-                    tools:text="☐  Plant the bamboo" />
+                    tools:text="Checking with Alfred…" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_chalkboard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone"
+                    tools:itemCount="3"
+                    tools:listitem="@layout/item_rolling_todo"
+                    tools:visibility="visible" />
+
+                <!-- Add row. Disabled, not hidden, when Alfred can't take writes. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/til_chalkboard_add"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="@string/chalkboard_add_hint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_chalkboard_add"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:imeOptions="actionDone"
+                            android:inputType="textCapSentences"
+                            android:maxLines="1" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <Button
+                        android:id="@+id/btn_chalkboard_add"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/chalkboard_add_action" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
         </LinearLayout>
 
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

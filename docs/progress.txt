@@ -977,3 +977,38 @@
     schedule-only (section_schedule visible, section_chalkboard gone), "Morning • 7k
     walk ..."; Rolling To-Do -> chalkboard-only, "☐ Reply to airer cover complaint ...".
     Confirms the tiles pull from the Alfred API independently of the removed button
+
+2026-07-18  Rolling to-do is now read-write (add / tick / drop) outside the alarm
+  - Scope: TodayFragment only (both home tiles open it). The alarm-flow content
+    screen (AlarmDismissalActivity) is untouched and still offers no write controls
+  - API contract as verified against the live Pi (differs from the task card):
+    POST /chalkboard body is {"text": ...} (not "task"); tick/drop take {"line": ...};
+    a stale tick/drop 404s with the current list wrapped in FastAPI detail:
+    {"detail":{"error":...,"items":[...]}}; GET /chalkboard EXCLUDES ticked items
+    immediately (they do not stay listed until the overnight sweep), and drop cannot
+    target an already-ticked line (404)
+  - Data: ChalkboardTaskDto/RollingTodoItem carry the raw vault "line" (targeting
+    key); done is derived from a "- [x]" line prefix. AlfredApiService gained the
+    three POSTs; AlfredRepository.write() maps outcomes to AlfredWriteResult
+    (Done / StaleTarget(current) / Unreachable), caching the 404's list
+  - ViewModel: optimistic update then refetch-to-reconcile for add/drop; tick keeps
+    the flipped local copy instead (a reconcile would hide the greyed row, since
+    Alfred filters ticked items) - the row leaves on the next refresh/sweep.
+    StaleTarget swaps in Alfred's list + "list refreshed" snackbar; Unreachable
+    refetches (undoing the optimism) + "change not saved" snackbar
+  - UI: RecyclerView rows (RollingTodoAdapter) - tap ticks (greyed + struck through),
+    long-press + confirm dialog drops, text field + Add button appends. Writes only
+    while the list is Fresh; on cache fallback the controls disable quietly
+    ("Alfred unreachable" hint). fragment_today.xml ScrollView -> NestedScrollView
+    (a wrap_content RecyclerView inside plain ScrollView truncated the list at ~10
+    items - found on device)
+  - ChalkboardRenderer (alarm screen) now draws a done item as a ticked struck-through
+    box - defensive only; live GET never returns ticked items today
+  - Tests: repository write outcomes incl. the FastAPI 404 shape; ViewModel
+    add/tick/drop optimism, stale-target refresh, failure restore, blank-input
+    rejection; RollingTodo line/done derivation; renderer done rendering. All green
+  - VERIFIED on device (SM-A326B, home WiFi, live API): added, ticked, and dropped
+    items land in the vault (confirmed via GET after each write) and survive
+    force-stop + relaunch; airplane mode shows the saved copy with write controls
+    disabled, no crash. Two ticked "DailySync write-test" lines remain in the vault
+    from probing - clearly labelled, tonight's sweep archives them

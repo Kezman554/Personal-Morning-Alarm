@@ -9,6 +9,7 @@ import com.personalmorningalarm.data.model.ScheduleTaskDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.Response
 import java.lang.reflect.Type
 
 /**
@@ -43,8 +44,69 @@ class AlfredRepository(
     suspend fun getChalkboard(): AlfredResult<List<ChalkboardTaskDto>> =
         fetch(
             endpoint = ENDPOINT_CHALKBOARD,
-            type = object : TypeToken<List<ChalkboardTaskDto>>() {}.type
+            type = CHALKBOARD_TYPE
         ) { it.getChalkboard() }
+
+    /** Adds an item to the rolling to-do. Alfred appends the checkbox and today's date. */
+    suspend fun addChalkboardItem(task: String): AlfredWriteResult =
+        write("add") { it.addChalkboardItem(ChalkboardAddRequest(task)) }
+
+    /** Ticks the item whose raw vault line is [line]. It stays listed until the sweep. */
+    suspend fun tickChalkboardItem(line: String): AlfredWriteResult =
+        write("tick") { it.tickChalkboardItem(ChalkboardLineRequest(line)) }
+
+    /** Drops the item whose raw vault line is [line] — no longer relevant, not done. */
+    suspend fun dropChalkboardItem(line: String): AlfredWriteResult =
+        write("drop") { it.dropChalkboardItem(ChalkboardLineRequest(line)) }
+
+    /**
+     * Runs a chalkboard write. A 404 means the targeting line went stale; its body
+     * carries the current list, which is cached (it is the freshest state we have)
+     * and handed back so the caller can resync in the same round trip.
+     */
+    private suspend fun write(
+        verb: String,
+        request: suspend (AlfredApiService) -> Response<Unit>
+    ): AlfredWriteResult = withContext(Dispatchers.IO) {
+        try {
+            val response = request(serviceProvider(settings))
+            when {
+                response.isSuccessful -> AlfredWriteResult.Done
+                response.code() == 404 -> staleTarget(verb, response)
+                else -> {
+                    Log.w(TAG, "Chalkboard $verb rejected: HTTP ${response.code()}")
+                    AlfredWriteResult.Unreachable
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            Log.d(TAG, "Alfred unreachable for chalkboard $verb (${e.javaClass.simpleName})")
+            AlfredWriteResult.Unreachable
+        }
+    }
+
+    /** Shape of a tick/drop 404 (FastAPI wraps it): {"detail":{"error":…,"items":[…]}}. */
+    private data class StaleTargetBody(val detail: Detail?) {
+        data class Detail(val items: List<ChalkboardTaskDto>?)
+    }
+
+    private fun staleTarget(verb: String, response: Response<Unit>): AlfredWriteResult {
+        val current: List<ChalkboardTaskDto>? = try {
+            gson.fromJson(response.errorBody()?.string(), StaleTargetBody::class.java)
+                ?.detail?.items
+        } catch (e: Exception) {
+            null
+        }
+        // A 404 whose body isn't the promised list is just a failed write.
+        if (current == null) {
+            Log.w(TAG, "Chalkboard $verb 404 without a usable list body")
+            return AlfredWriteResult.Unreachable
+        }
+        Log.d(TAG, "Chalkboard $verb hit a stale line — resynced ${current.size} items")
+        cache.put(ENDPOINT_CHALKBOARD, gson.toJson(current))
+        return AlfredWriteResult.StaleTarget(current)
+    }
 
     /**
      * Calls [request], caching its response under [endpoint]. [type] is how the
@@ -88,5 +150,8 @@ class AlfredRepository(
 
         const val ENDPOINT_DAILY_SCHEDULE = "daily-schedule"
         const val ENDPOINT_CHALKBOARD = "chalkboard"
+
+        private val CHALKBOARD_TYPE: Type =
+            object : TypeToken<List<ChalkboardTaskDto>>() {}.type
     }
 }

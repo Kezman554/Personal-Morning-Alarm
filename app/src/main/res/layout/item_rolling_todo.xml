@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One rolling to-do row on the Today screen: tap ticks, long-press drops. -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="top"
+    android:orientation="horizontal"
+    android:paddingVertical="6dp">
+
+    <!-- Display only — the row itself is the tap target, so a half-awake thumb
+         doesn't have to hit a checkbox. -->
+    <CheckBox
+        android:id="@+id/cb_todo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:minWidth="0dp"
+        android:minHeight="0dp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_todo_task"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingMultiplier="1.15"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
+            tools:text="Plant the bamboo" />
+
+        <TextView
+            android:id="@+id/tv_todo_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="5 Jul 2026" />
+
+    </LinearLayout>
+
+</LinearLayout>

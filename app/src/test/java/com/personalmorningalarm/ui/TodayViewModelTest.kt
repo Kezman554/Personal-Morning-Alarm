@@ -1,6 +1,7 @@
 package com.personalmorningalarm.ui
 
 import androidx.test.core.app.ApplicationProvider
+import com.google.gson.Gson
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.remote.AlfredApiService
@@ -8,11 +9,22 @@ import com.personalmorningalarm.data.remote.AlfredRepository
 import com.personalmorningalarm.data.remote.AlfredResponseCache
 import com.personalmorningalarm.data.remote.AlfredResult
 import com.personalmorningalarm.data.remote.AlfredSettings
+import com.personalmorningalarm.data.remote.ChalkboardAddRequest
+import com.personalmorningalarm.data.remote.ChalkboardLineRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import okhttp3.MediaType
+import okhttp3.ResponseBody
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import retrofit2.Response
 import java.io.IOException
 
 /**
@@ -31,6 +43,8 @@ class TodayViewModelTest : ViewModelTestSupport() {
     // for real rather than by swapping in a second ViewModel. Null = unreachable.
     private var scheduleResponse: List<ScheduleTaskDto>? = null
     private var chalkboardResponse: List<ChalkboardTaskDto>? = null
+    private var writeResponse: (() -> Response<Unit>)? = null
+    private var writesSeen = 0
 
     private val alfred by lazy {
         AlfredRepository(
@@ -43,9 +57,43 @@ class TodayViewModelTest : ViewModelTestSupport() {
 
                     override suspend fun getChalkboard(): List<ChalkboardTaskDto> =
                         chalkboardResponse ?: throw IOException("Alfred unreachable")
+
+                    override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> = write()
+
+                    override suspend fun tickChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
+
+                    override suspend fun dropChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
+
+                    private fun write(): Response<Unit> {
+                        writesSeen++
+                        return writeResponse?.invoke() ?: throw IOException("Alfred unreachable")
+                    }
                 }
             }
         )
+    }
+
+    // Events are hot and drop without a subscriber, so tests that expect one
+    // subscribe here before poking the ViewModel.
+    private val events = mutableListOf<TodayViewModel.TodayEvent>()
+    private val eventScope = CoroutineScope(Dispatchers.Main + Job())
+
+    private fun trackEvents(vm: TodayViewModel) {
+        eventScope.launch { vm.events.collect { events += it } }
+    }
+
+    private fun awaitEvent(expected: TodayViewModel.TodayEvent) {
+        val deadline = System.currentTimeMillis() + 3_000
+        while (System.currentTimeMillis() < deadline) {
+            if (expected in events) return
+            Thread.sleep(15)
+        }
+        throw AssertionError("Event $expected never arrived; saw $events")
+    }
+
+    @After
+    fun tearDownEvents() {
+        eventScope.cancel()
     }
 
     /** A ViewModel that has finished its initial load. */
@@ -132,5 +180,105 @@ class TodayViewModelTest : ViewModelTestSupport() {
         assertTrue(state.chalkboard is AlfredResult.Stale)
         assertEquals(schedule, (state.schedule as AlfredResult.Stale).data)
         assertEquals(chalkboard, (state.chalkboard as AlfredResult.Stale).data)
+    }
+
+    // --- chalkboard writes ---
+
+    private val fenceLine = "- [ ] Fix fence (2026-07-18)"
+    private val fence = ChalkboardTaskDto("Fix fence", "2026-07-18", fenceLine)
+
+    /** A ViewModel with a live chalkboard on screen — the only state writes run from. */
+    private fun writableViewModel(items: List<ChalkboardTaskDto>): TodayViewModel {
+        scheduleResponse = schedule
+        chalkboardResponse = items
+        val vm = loadedViewModel()
+        trackEvents(vm)
+        return vm
+    }
+
+    @Test
+    fun `an accepted add reconciles to Alfred's copy of the list`() {
+        val vm = writableViewModel(chalkboard)
+
+        // Alfred takes the write; its list then carries the item with its real line.
+        writeResponse = { Response.success(Unit) }
+        chalkboardResponse = chalkboard + fence
+        vm.addItem("Fix fence")
+
+        val state = awaitValue(vm.state) {
+            (it.chalkboard as? AlfredResult.Fresh)?.data == chalkboard + fence
+        }
+        assertTrue(state.chalkboard is AlfredResult.Fresh)
+    }
+
+    @Test
+    fun `blank input never reaches Alfred`() {
+        val vm = writableViewModel(chalkboard)
+
+        vm.addItem("   \n ")
+
+        // Nothing to wait for — give any wrongly-launched write time to land.
+        Thread.sleep(150)
+        assertEquals(0, writesSeen)
+        assertEquals(chalkboard, (vm.state.value.chalkboard as AlfredResult.Fresh).data)
+    }
+
+    @Test
+    fun `a tick keeps the item listed as flipped, despite Alfred hiding ticked items`() {
+        val vm = writableViewModel(listOf(fence))
+        writeResponse = { Response.success(Unit) }
+        // Alfred's listings exclude ticked items immediately — a refetch here
+        // would hide the row. The ViewModel must keep the flipped local copy.
+        chalkboardResponse = emptyList()
+
+        vm.tickItem(fenceLine)
+
+        val state = awaitValue(vm.state) {
+            (it.chalkboard as? AlfredResult.Fresh)?.data?.single()?.line?.contains("[x]") == true
+        }
+        assertEquals(1, (state.chalkboard as AlfredResult.Fresh).data.size)
+    }
+
+    @Test
+    fun `a drop removes the item and reconciles`() {
+        val vm = writableViewModel(chalkboard + fence)
+        writeResponse = { Response.success(Unit) }
+        chalkboardResponse = chalkboard
+
+        vm.dropItem(fenceLine)
+
+        awaitValue(vm.state) { (it.chalkboard as? AlfredResult.Fresh)?.data == chalkboard }
+    }
+
+    @Test
+    fun `a stale target swaps in the list Alfred returned and says so`() {
+        val vm = writableViewModel(listOf(fence))
+        val current = listOf(ChalkboardTaskDto("Plant the bamboo", null, "- [ ] Plant the bamboo"))
+        writeResponse = {
+            // The list rides inside FastAPI's detail wrapper, as the live API sends it.
+            val body = """{"detail":{"error":"item not found","items":${Gson().toJson(current)}}}"""
+            Response.error(404, ResponseBody.create(MediaType.parse("application/json"), body))
+        }
+
+        vm.tickItem(fenceLine)
+
+        awaitValue(vm.state) { (it.chalkboard as? AlfredResult.Fresh)?.data == current }
+        awaitEvent(TodayViewModel.TodayEvent.LIST_REFRESHED)
+    }
+
+    @Test
+    fun `a write Alfred never received restores the cached list and says so`() {
+        val vm = writableViewModel(listOf(fence))
+
+        // Alfred vanishes between the fetch and the tap.
+        writeResponse = null
+        chalkboardResponse = null
+        vm.tickItem(fenceLine)
+
+        // The optimistic flip is undone by the reconciling refetch, which now
+        // serves the cached pre-write list — stale, so writes disable.
+        val state = awaitValue(vm.state) { it.chalkboard is AlfredResult.Stale }
+        assertEquals(listOf(fence), (state.chalkboard as AlfredResult.Stale).data)
+        awaitEvent(TodayViewModel.TodayEvent.WRITE_FAILED)
     }
 }

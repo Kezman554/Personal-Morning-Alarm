@@ -110,6 +110,29 @@ class AlfredRendererTest {
     }
 
     @Test
+    fun `chalkboard shows ticked-but-unswept items as done, not resurrected`() {
+        val items = RollingTodo.items(
+            listOf(
+                ChalkboardTaskDto("Fix fence", null, "- [x] Fix fence"),
+                ChalkboardTaskDto("Plant the bamboo", null, "- [ ] Plant the bamboo")
+            )
+        )
+
+        val rendered = ChalkboardRenderer.format(items, Color.GRAY)
+        val text = rendered.toString()
+
+        assertEquals("☑  Fix fence\n☐  Plant the bamboo", text)
+        // Struck through — done, still listed until the overnight sweep.
+        val spanned = rendered as Spanned
+        val struck = spanned.getSpans(0, rendered.length, android.text.style.StrikethroughSpan::class.java)
+        assertEquals(1, struck.size)
+        assertEquals(
+            "☑  Fix fence",
+            text.substring(spanned.getSpanStart(struck[0]), spanned.getSpanEnd(struck[0]))
+        )
+    }
+
+    @Test
     fun `empty input renders empty, not a stray heading or box`() {
         assertEquals("", ScheduleRenderer.format(context, emptyList()).toString())
         assertEquals("", ChalkboardRenderer.format(emptyList(), Color.GRAY).toString())

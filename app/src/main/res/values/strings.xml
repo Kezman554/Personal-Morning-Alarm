@@ -79,6 +79,16 @@
     <string name="chalkboard_stale">Saved copy — Alfred unreachable</string>
 
     <!-- Today screen (on-demand Alfred dashboard, outside the alarm flow) -->
+    <!-- Rolling to-do editing (Today screen only — the alarm-flow screen is read-only) -->
+    <string name="chalkboard_add_hint">Add to the list</string>
+    <string name="chalkboard_add_action">Add</string>
+    <string name="chalkboard_read_only_hint">Alfred unreachable</string>
+    <string name="chalkboard_drop_title">Drop this item?</string>
+    <string name="chalkboard_drop_message">“%1$s” will be removed as no longer relevant. To mark it done instead, tap it.</string>
+    <string name="chalkboard_drop_confirm">Drop</string>
+    <string name="chalkboard_list_refreshed">The list had changed on Alfred — refreshed</string>
+    <string name="chalkboard_write_failed">Alfred didn\'t take the change — list restored</string>
+
     <string name="today_screen_title">Today</string>
     <string name="today_schedule_section">Today\'s Schedule</string>
     <string name="today_chalkboard_section">Rolling To-Do</string>

@@ -10,7 +10,11 @@ data class RollingTodoItem(
     /** Wikilinks resolved; still carries emphasis markers for the renderer. */
     val task: String,
     /** Display date, or null when the item has none — never the string "null". */
-    val date: String?
+    val date: String?,
+    /** Raw vault line — the targeting key for tick/drop. Null on pre-line cached data. */
+    val line: String? = null,
+    /** Ticked in the vault, awaiting the overnight sweep. Shown struck through, not hidden. */
+    val done: Boolean = false
 )
 
 /**
@@ -24,11 +28,22 @@ object RollingTodo {
     // shown as sent rather than guessed at or dropped.
     private val DISPLAY_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.UK)
 
+    // "- [x]" at the start of the raw line. Done state lives in the markdown
+    // itself — the API sends no separate flag.
+    private val TICKED = Regex("""^\s*-\s*\[[xX]]""")
+
     fun items(tasks: List<ChalkboardTaskDto>): List<RollingTodoItem> =
         tasks
             // A task with no text is nothing to show, whatever its date.
             .filter { !it.task.isNullOrBlank() }
-            .map { RollingTodoItem(VaultText.stripWikiLinks(it.task!!.trim()), displayDate(it.date)) }
+            .map {
+                RollingTodoItem(
+                    task = VaultText.stripWikiLinks(it.task!!.trim()),
+                    date = displayDate(it.date),
+                    line = it.line,
+                    done = it.line != null && TICKED.containsMatchIn(it.line)
+                )
+            }
 
     /**
      * ISO dates render as "8 Apr 2026". A date in any other shape is passed

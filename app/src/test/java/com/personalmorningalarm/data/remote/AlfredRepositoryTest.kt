@@ -1,14 +1,18 @@
 package com.personalmorningalarm.data.remote
 
 import androidx.test.core.app.ApplicationProvider
+import com.google.gson.Gson
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import kotlinx.coroutines.runBlocking
+import okhttp3.MediaType
+import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import retrofit2.Response
 import java.io.IOException
 
 /**
@@ -22,10 +26,11 @@ class AlfredRepositoryTest {
     private val settings = AlfredSettings(context)
     private val cache = AlfredResponseCache(context)
 
-    /** An Alfred that answers each endpoint with the list given, or throws if null. */
+    /** An Alfred that answers each endpoint with the value given, or throws if null. */
     private fun repository(
         response: List<ScheduleTaskDto>? = null,
-        chalkboardResponse: List<ChalkboardTaskDto>? = null
+        chalkboardResponse: List<ChalkboardTaskDto>? = null,
+        writeResponse: (() -> Response<Unit>)? = null
     ) = AlfredRepository(
         settings,
         cache,
@@ -36,6 +41,15 @@ class AlfredRepositoryTest {
 
                 override suspend fun getChalkboard(): List<ChalkboardTaskDto> =
                     chalkboardResponse ?: throw IOException("Alfred unreachable")
+
+                override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> = write()
+
+                override suspend fun tickChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
+
+                override suspend fun dropChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = write()
+
+                private fun write(): Response<Unit> =
+                    writeResponse?.invoke() ?: throw IOException("Alfred unreachable")
             }
         }
     )
@@ -120,6 +134,59 @@ class AlfredRepositoryTest {
         repository(chalkboardResponse = chalkboard).getChalkboard()
         val stale = repository().getDailySchedule()
         assertEquals(schedule, (stale as AlfredResult.Stale).data)
+    }
+
+    // --- chalkboard writes: like the reads, nothing here may throw ---
+
+    private val gson = Gson()
+
+    private fun jsonBody(json: String): ResponseBody =
+        ResponseBody.create(MediaType.parse("application/json"), json)
+
+    /** A tick/drop 404 as the live API sends it: the list wrapped in FastAPI's detail. */
+    private fun staleTargetBody(list: List<ChalkboardTaskDto>): ResponseBody =
+        jsonBody("""{"detail":{"error":"item not found","items":${gson.toJson(list)}}}""")
+
+    @Test
+    fun `a landed write reports done`() = runBlocking {
+        val repo = repository(writeResponse = { Response.success(Unit) })
+
+        assertEquals(AlfredWriteResult.Done, repo.addChalkboardItem("Fix fence"))
+        assertEquals(AlfredWriteResult.Done, repo.tickChalkboardItem("- [ ] Fix fence"))
+        assertEquals(AlfredWriteResult.Done, repo.dropChalkboardItem("- [ ] Fix fence"))
+    }
+
+    @Test
+    fun `a write against an unreachable Alfred fails quietly, not an exception`() = runBlocking {
+        assertEquals(AlfredWriteResult.Unreachable, repository().tickChalkboardItem("- [ ] Fix fence"))
+    }
+
+    @Test
+    fun `a stale target returns the current list and refreshes the cache in the same round trip`() =
+        runBlocking {
+            val current = listOf(ChalkboardTaskDto("Fix fence", null, "- [ ] Fix fence"))
+            val repo = repository(writeResponse = { Response.error(404, staleTargetBody(current)) })
+
+            val result = repo.tickChalkboardItem("- [ ] Long gone")
+
+            assertEquals(current, (result as AlfredWriteResult.StaleTarget).current)
+            // The 404 body refreshed the cache: a now-dead Alfred serves that list stale.
+            val stale = repository().getChalkboard()
+            assertEquals(current, (stale as AlfredResult.Stale).data)
+        }
+
+    @Test
+    fun `a 404 without a usable list body is just a failed write`() = runBlocking {
+        val repo = repository(writeResponse = { Response.error(404, jsonBody("{not json")) })
+
+        assertEquals(AlfredWriteResult.Unreachable, repo.dropChalkboardItem("- [ ] Fix fence"))
+    }
+
+    @Test
+    fun `an unexpected server error is a failed write, not an exception`() = runBlocking {
+        val repo = repository(writeResponse = { Response.error(500, jsonBody("boom")) })
+
+        assertEquals(AlfredWriteResult.Unreachable, repo.addChalkboardItem("Fix fence"))
     }
 
     @Test
