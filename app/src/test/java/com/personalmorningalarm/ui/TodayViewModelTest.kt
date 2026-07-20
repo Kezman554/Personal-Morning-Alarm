@@ -95,6 +95,12 @@ class TodayViewModelTest : ViewModelTestSupport() {
                     override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
                         throw IOException("Alfred unreachable")
 
+                    override suspend fun getInbox(): List<com.personalmorningalarm.data.model.InboxCaptureDto> =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun capture(body: okhttp3.RequestBody): Response<Unit> =
+                        throw IOException("Alfred unreachable")
+
                     private fun write(): Response<Unit> {
                         writesSeen++
                         return writeResponse?.invoke() ?: throw IOException("Alfred unreachable")

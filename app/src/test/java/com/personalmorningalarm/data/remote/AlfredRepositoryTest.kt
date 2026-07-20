@@ -3,6 +3,7 @@ package com.personalmorningalarm.data.remote
 import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
+import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.model.ShoppingItemDto
 import com.personalmorningalarm.data.model.ShoppingListDetailDto
@@ -10,6 +11,7 @@ import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
+import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,7 +41,9 @@ class AlfredRepositoryTest {
         shoppingListsResponse: List<ShoppingListSummaryDto>? = null,
         shoppingListResponse: ShoppingListDetailDto? = null,
         createShoppingListResponse: (() -> Response<ShoppingListSummaryDto>)? = null,
-        shoppingWriteResponse: (() -> Response<Unit>)? = null
+        shoppingWriteResponse: (() -> Response<Unit>)? = null,
+        inboxResponse: List<InboxCaptureDto>? = null,
+        captureResponse: (() -> Response<Unit>)? = null
     ) = AlfredRepository(
         settings,
         cache,
@@ -77,6 +81,12 @@ class AlfredRepositoryTest {
 
                 override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
                     shoppingWrite()
+
+                override suspend fun getInbox(): List<InboxCaptureDto> =
+                    inboxResponse ?: throw IOException("Alfred unreachable")
+
+                override suspend fun capture(body: RequestBody): Response<Unit> =
+                    captureResponse?.invoke() ?: throw IOException("Alfred unreachable")
 
                 private fun write(): Response<Unit> =
                     writeResponse?.invoke() ?: throw IOException("Alfred unreachable")
@@ -390,5 +400,43 @@ class AlfredRepositoryTest {
         val repo = repository(shoppingWriteResponse = { Response.error(404, jsonBody("{not json")) })
 
         assertEquals(ShoppingWriteResult.Unreachable, repo.dropShoppingItem(fitnessId, "- [ ] Dip bars"))
+    }
+
+    private val captures = listOf(InboxCaptureDto("2026-07-17-1356-a-thought.md", "The body"))
+
+    @Test
+    fun `the inbox falls back to the last set Alfred served`() = runBlocking {
+        repository(inboxResponse = captures).getInbox()
+
+        val stale = repository().getInbox()
+
+        assertTrue(stale is AlfredResult.Stale)
+        assertEquals(captures, (stale as AlfredResult.Stale).data)
+    }
+
+    @Test
+    fun `a capture that lands is Done`() = runBlocking {
+        val repo = repository(captureResponse = { Response.success(Unit) })
+
+        assertEquals(InboxWriteResult.Done, repo.captureToInbox("A thought"))
+    }
+
+    @Test
+    fun `a 4xx means Alfred read the capture and refused it — never retried`() = runBlocking {
+        val repo = repository(captureResponse = { Response.error(422, jsonBody("""{"detail":"empty"}""")) })
+
+        assertEquals(InboxWriteResult.Rejected, repo.captureToInbox(""))
+    }
+
+    @Test
+    fun `a 5xx is unreachable, so the capture stays queued for a retry`() = runBlocking {
+        val repo = repository(captureResponse = { Response.error(503, jsonBody("""{"detail":"down"}""")) })
+
+        assertEquals(InboxWriteResult.Unreachable, repo.captureToInbox("A thought"))
+    }
+
+    @Test
+    fun `an unreachable Alfred never throws on a capture`() = runBlocking {
+        assertEquals(InboxWriteResult.Unreachable, repository().captureToInbox("A thought"))
     }
 }

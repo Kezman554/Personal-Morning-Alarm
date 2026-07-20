@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
+import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.model.ShoppingItemDto
 import com.personalmorningalarm.data.model.ShoppingListDetailDto
@@ -13,6 +14,8 @@ import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType
+import okhttp3.RequestBody
 import retrofit2.Response
 import java.lang.reflect.Type
 
@@ -127,6 +130,41 @@ class AlfredRepository(
     /** Drops the item whose raw vault line is [line] in list [listId] — no longer wanted. */
     suspend fun dropShoppingItem(listId: String, line: String): ShoppingWriteResult =
         writeShopping(listId, "drop") { it.dropShoppingItem(listId, ShoppingLineRequest(line)) }
+
+    /** The vault's current `0-inbox/` captures, falling back to the last set Alfred served. */
+    suspend fun getInbox(): AlfredResult<List<InboxCaptureDto>> =
+        fetch(
+            endpoint = ENDPOINT_INBOX,
+            type = INBOX_TYPE
+        ) { it.getInbox() }
+
+    /**
+     * Captures [text] as a new file in `0-inbox/`. Unlike every other write here
+     * there's no targeting key and so no stale case: a 4xx means Alfred read the
+     * text and refused it, which no amount of retrying will change, so it comes back
+     * as [InboxWriteResult.Rejected] rather than being retried forever.
+     */
+    suspend fun captureToInbox(text: String): InboxWriteResult = withContext(Dispatchers.IO) {
+        try {
+            val response = serviceProvider(settings).capture(capturePlainText(text))
+            when {
+                response.isSuccessful -> InboxWriteResult.Done
+                response.code() in 400..499 -> {
+                    Log.w(TAG, "Inbox capture refused: HTTP ${response.code()}")
+                    InboxWriteResult.Rejected
+                }
+                else -> {
+                    Log.w(TAG, "Inbox capture rejected: HTTP ${response.code()}")
+                    InboxWriteResult.Unreachable
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            Log.d(TAG, "Alfred unreachable for inbox capture (${e.javaClass.simpleName})")
+            InboxWriteResult.Unreachable
+        }
+    }
 
     /**
      * Runs a chalkboard write. A 404 means the targeting line went stale; its body
@@ -276,9 +314,18 @@ class AlfredRepository(
         const val ENDPOINT_WEEK_SCHEDULE = "daily-schedule/week"
         const val ENDPOINT_CHALKBOARD = "chalkboard"
         const val ENDPOINT_SHOPPING = "shopping"
+        const val ENDPOINT_INBOX = "inbox"
 
         private val CHALKBOARD_TYPE: Type =
             object : TypeToken<List<ChalkboardTaskDto>>() {}.type
+
+        private val INBOX_TYPE: Type =
+            object : TypeToken<List<InboxCaptureDto>>() {}.type
+
+        private val PLAIN_TEXT: MediaType? = MediaType.parse("text/plain; charset=utf-8")
+
+        /** POST /inbox takes the capture as a plain-text body, not JSON. */
+        fun capturePlainText(text: String): RequestBody = RequestBody.create(PLAIN_TEXT, text)
 
         /** Each list caches independently — a slash is a fine SharedPreferences key. */
         fun shoppingListEndpoint(listId: String): String = "$ENDPOINT_SHOPPING/$listId"

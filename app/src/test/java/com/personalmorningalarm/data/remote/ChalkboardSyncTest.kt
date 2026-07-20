@@ -82,6 +82,11 @@ class ChalkboardSyncTest {
                 override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
                     throw IOException()
 
+                override suspend fun getInbox(): List<com.personalmorningalarm.data.model.InboxCaptureDto> =
+                    throw IOException()
+
+                override suspend fun capture(body: okhttp3.RequestBody): Response<Unit> = throw IOException()
+
                 private fun write(label: String): Response<Unit> {
                     writesSeen += label
                     val next = responses.removeFirstOrNull() ?: throw IOException("Alfred unreachable")

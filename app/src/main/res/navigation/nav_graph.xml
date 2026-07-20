@@ -20,7 +20,17 @@
         <action
             android:id="@+id/action_tiles_to_shoppingMenu"
             app:destination="@id/shoppingMenuFragment" />
+        <action
+            android:id="@+id/action_tiles_to_inbox"
+            app:destination="@id/inboxFragment" />
     </fragment>
+
+    <!-- Inbox tile: the vault's 0-inbox/ captures (read-only) + a compose box. -->
+    <fragment
+        android:id="@+id/inboxFragment"
+        android:name="com.personalmorningalarm.ui.InboxFragment"
+        android:label="@string/inbox_title"
+        tools:layout="@layout/fragment_inbox" />
 
     <!-- The Daily Schedule tile: the whole plan week, one page per day. -->
     <fragment

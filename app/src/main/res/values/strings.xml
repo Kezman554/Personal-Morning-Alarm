@@ -120,6 +120,24 @@
     <string name="shopping_drop_title">Drop this item?</string>
     <string name="shopping_drop_message">“%1$s” will be removed as no longer wanted. To mark it bought instead, tap it.</string>
 
+    <!-- Inbox tile (Alfred /inbox) — read-only list, capture-only write -->
+    <string name="inbox_title">Inbox</string>
+    <string name="inbox_unavailable">Inbox unavailable</string>
+    <string name="inbox_empty">Inbox is clear</string>
+    <string name="inbox_capture_hint">Capture a thought</string>
+    <string name="inbox_offline_hint">Capture a thought (offline — will sync)</string>
+    <string name="inbox_capture_action">Capture</string>
+    <string name="inbox_captured">Captured to the inbox</string>
+    <string name="inbox_capture_refused">Alfred wouldn\'t take that capture</string>
+    <plurals name="inbox_pending_count">
+        <item quantity="one">%d capture waiting to sync</item>
+        <item quantity="other">%d captures waiting to sync</item>
+    </plurals>
+    <plurals name="inbox_refused_notice">
+        <item quantity="one">%d capture couldn\'t be filed:</item>
+        <item quantity="other">%d captures couldn\'t be filed:</item>
+    </plurals>
+
     <string name="week_schedule_title">Daily Schedule</string>
     <string name="week_no_plan">No plan this week yet</string>
     <string name="week_day_empty">No plan for this day</string>
@@ -133,6 +151,7 @@
     <string name="tile_daily_schedule">Daily Schedule</string>
     <string name="tile_rolling_todo">Rolling To-Do</string>
     <string name="tile_shopping_lists">Shopping Lists</string>
+    <string name="tile_inbox">Inbox</string>
     <string name="tile_kitchen_sync">KitchenSync</string>
     <string name="tile_kanban">Kanban</string>
     <string name="tile_coming_soon">Coming soon</string>

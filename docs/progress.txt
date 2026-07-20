@@ -1188,3 +1188,41 @@
     (this session's create/offline test, its one item already dropped) — no
     DELETE endpoint exists to remove the list files themselves; Nick's to tidy up
     by hand if he wants them gone
+
+2026-07-20 - Inbox capture tile (Y7, Alfred T7)
+  - Confirmed T7 live on the Pi before starting: GET /inbox returns
+    [{filename, content}] newest first; POST /inbox is present in the OpenAPI
+    schema and takes the capture as a text/plain body, not JSON. Note the 405
+    "allow: GET" header on an OPTIONS probe is a Starlette quirk, not a missing
+    route — /chalkboard (whose POST demonstrably works) reports the same. POST
+    was NOT probed live: no DELETE exists, so a speculative capture would leave
+    a real vault file behind.
+  - New home tile "Inbox" -> InboxFragment: the vault's current 0-inbox/
+    captures, read-only (no tick, no drop, no tap target on a row — inbox items
+    are only ever resolved by a vault triage session), plus a compose box that
+    POSTs a new capture. Filenames are parsed into a title + "17 Jul, 13:56"
+    captured-at; hand-named files keep their own name.
+  - Writes ride a new pending_inbox_writes queue (DB v7 -> v8), the third in the
+    ChalkboardSync/ShoppingSync family and the simplest: one verb, no targeting
+    line, so no stale-target case. Its "failed" flag means something narrower
+    than the other two queues' — not "the vault moved on" but "Alfred answered
+    4xx and refused this text", which is failed-and-kept so one bad capture
+    can't stall the FIFO behind it. Same MainActivity foreground/network flush
+    triggers as the other two queues.
+  - The compose field is multi-line (a capture is free-form prose) and so has
+    no IME "done" action — the Capture button is the only submit. Deliberate
+    divergence from the shopping/to-do add rows, where Enter sends.
+  - Retrofit detail worth remembering: POST /inbox takes a raw okhttp
+    RequestBody, not a String — the Gson converter would serialise a String to
+    a quoted JSON scalar and send it as application/json, which the endpoint
+    doesn't accept.
+  - Tests: 16 new unit tests (InboxTest x10, InboxSyncTest x6) + 5 added to
+    AlfredRepositoryTest, covering the plain-text body, FIFO replay, the
+    unreachable-stops-the-flush contract, and 4xx-refused vs 5xx-retryable.
+    Full suite green.
+  - NOT YET VERIFIED ON DEVICE: installDebug succeeded on the A32, then the
+    phone dropped off USB before the live test could run (it was also on the
+    secure lock screen). Still to do, once it's reconnected: send a capture and
+    confirm it lands in 0-inbox/; svc wifi disable, capture again, confirm the
+    pending marker; svc wifi enable, confirm the flush — the same three checks
+    Y5 and Y6 used.

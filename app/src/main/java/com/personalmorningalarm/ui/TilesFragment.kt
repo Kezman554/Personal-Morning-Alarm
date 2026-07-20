@@ -47,6 +47,10 @@ class TilesFragment : Fragment() {
             findNavController().navigate(R.id.action_tiles_to_shoppingMenu)
         }
 
+        liveTile(binding.tileInbox, R.string.tile_inbox) {
+            findNavController().navigate(R.id.action_tiles_to_inbox)
+        }
+
         comingSoonTile(binding.tileKitchenSync, R.string.tile_kitchen_sync)
         comingSoonTile(binding.tileKanban, R.string.tile_kanban)
     }

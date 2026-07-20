@@ -2,15 +2,12 @@ package com.personalmorningalarm.data.remote
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.google.gson.Gson
 import com.personalmorningalarm.data.AppDatabase
-import com.personalmorningalarm.data.dao.PendingShoppingWriteDao
-import com.personalmorningalarm.data.entity.PendingShoppingWrite
-import com.personalmorningalarm.data.entity.ShoppingVerb
+import com.personalmorningalarm.data.dao.PendingInboxWriteDao
+import com.personalmorningalarm.data.entity.PendingInboxWrite
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
-import com.personalmorningalarm.data.model.ShoppingItemDto
 import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
 import kotlinx.coroutines.flow.first
@@ -18,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
+import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,22 +27,23 @@ import retrofit2.Response
 import java.io.IOException
 
 /**
- * The shopping queue's replay contract — mirrors [ChalkboardSyncTest] — plus the
- * one thing that's new here: entries carry a [PendingShoppingWrite.listId] and
- * replay must dispatch each to its own list's endpoint.
+ * The inbox queue's replay contract — mirrors [ShoppingSyncTest]. The difference
+ * that matters here is the failure mode: a capture has no targeting key, so it can
+ * never go stale; what it can do is be refused outright, and a refusal must not
+ * stall the captures queued behind it.
  */
 @RunWith(RobolectricTestRunner::class)
-class ShoppingSyncTest {
+class InboxSyncTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.app.Application>()
 
     private val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
         .allowMainThreadQueries()
         .build()
-    private val dao = db.pendingShoppingWriteDao()
+    private val dao = db.pendingInboxWriteDao()
 
-    /** Every write the fake Alfred saw, in order — "list:ADD:text" / "list:TICK:line" / "list:DROP:line". */
-    private val writesSeen = mutableListOf<String>()
+    /** Every capture body the fake Alfred saw, in order. */
+    private val capturesSeen = mutableListOf<String>()
 
     /** Per-write behaviour, consumed in order; missing entries mean "unreachable". */
     private val responses = ArrayDeque<() -> Response<Unit>>()
@@ -66,22 +65,17 @@ class ShoppingSyncTest {
                     throw IOException()
                 override suspend fun createShoppingList(body: ShoppingCreateRequest): Response<ShoppingListSummaryDto> =
                     throw IOException()
-
                 override suspend fun addShoppingItem(listId: String, body: ShoppingAddRequest): Response<Unit> =
-                    write("$listId:ADD:${body.text}")
-
+                    throw IOException()
                 override suspend fun tickShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
-                    write("$listId:TICK:${body.line}")
-
+                    throw IOException()
                 override suspend fun dropShoppingItem(listId: String, body: ShoppingLineRequest): Response<Unit> =
-                    write("$listId:DROP:${body.line}")
+                    throw IOException()
 
                 override suspend fun getInbox(): List<InboxCaptureDto> = throw IOException()
 
-                override suspend fun capture(body: RequestBody): Response<Unit> = throw IOException()
-
-                private fun write(label: String): Response<Unit> {
-                    writesSeen += label
+                override suspend fun capture(body: RequestBody): Response<Unit> {
+                    capturesSeen += body.readText()
                     val next = responses.removeFirstOrNull() ?: throw IOException("Alfred unreachable")
                     return next()
                 }
@@ -89,16 +83,12 @@ class ShoppingSyncTest {
         }
     )
 
-    private val sync = ShoppingSync(repository, dao)
-
-    private val fitness = "6-life/shopping/fitness.md"
-    private val fashion = "6-life/shopping/fashion.md"
+    private val sync = InboxSync(repository, dao)
 
     private fun accept() = { Response.success(Unit) }
 
-    private fun staleTarget(): () -> Response<Unit> = {
-        val body = """{"detail":{"error":"item not found","list_id":"$fitness","items":${Gson().toJson(emptyList<ShoppingItemDto>())}}}"""
-        Response.error(404, ResponseBody.create(MediaType.parse("application/json"), body))
+    private fun refuse(): () -> Response<Unit> = {
+        Response.error(422, ResponseBody.create(MediaType.parse("application/json"), """{"detail":"empty capture"}"""))
     }
 
     @After
@@ -107,18 +97,29 @@ class ShoppingSyncTest {
     }
 
     @Test
-    fun `flush replays the queue in capture order across lists and empties it`() = runBlocking {
-        sync.enqueue(fitness, ShoppingVerb.ADD, "Dip bars")
-        sync.enqueue(fashion, ShoppingVerb.TICK, "Scarf", "- [ ] Scarf")
-        sync.enqueue(fitness, ShoppingVerb.DROP, "Old idea", "- [ ] Old idea")
+    fun `the capture body is sent as plain text, not as a JSON scalar`() = runBlocking {
+        sync.enqueue("Buy a 12.5kg dumbbell pair")
+        responses += accept()
+
+        sync.flush()
+
+        // Gson would have sent "\"Buy a 12.5kg dumbbell pair\"" — the endpoint takes text/plain.
+        assertEquals(listOf("Buy a 12.5kg dumbbell pair"), capturesSeen)
+        val contentType = AlfredRepository.capturePlainText("x").contentType()
+        assertEquals("text", contentType?.type())
+        assertEquals("plain", contentType?.subtype())
+    }
+
+    @Test
+    fun `flush replays the queue in capture order and empties it`() = runBlocking {
+        sync.enqueue("First thought")
+        sync.enqueue("Second thought")
+        sync.enqueue("Third thought")
         repeat(3) { responses += accept() }
 
         val outcome = sync.flush()
 
-        assertEquals(
-            listOf("$fitness:ADD:Dip bars", "$fashion:TICK:- [ ] Scarf", "$fitness:DROP:- [ ] Old idea"),
-            writesSeen
-        )
+        assertEquals(listOf("First thought", "Second thought", "Third thought"), capturesSeen)
         assertEquals(3, outcome.delivered)
         assertEquals(0, outcome.remaining)
         assertFalse(sync.hasPending())
@@ -126,70 +127,62 @@ class ShoppingSyncTest {
 
     @Test
     fun `an unreachable Alfred stops the flush and keeps everything queued`() = runBlocking {
-        sync.enqueue(fitness, ShoppingVerb.ADD, "Dip bars")
-        sync.enqueue(fashion, ShoppingVerb.ADD, "Scarf")
+        sync.enqueue("First thought")
+        sync.enqueue("Second thought")
 
         val outcome = sync.flush()
 
         assertEquals(0, outcome.delivered)
         assertEquals(2, outcome.remaining)
-        assertEquals(1, writesSeen.size)
+        assertEquals(1, capturesSeen.size)
         assertTrue(sync.hasPending())
     }
 
     @Test
-    fun `a stale target is failed and kept, and never blocks the rest of the queue`() = runBlocking {
-        sync.enqueue(fitness, ShoppingVerb.TICK, "Long gone", "- [ ] Long gone")
-        sync.enqueue(fashion, ShoppingVerb.ADD, "Scarf")
-        responses += staleTarget()
+    fun `a refused capture is failed and kept, and never blocks the rest of the queue`() = runBlocking {
+        sync.enqueue("Something Alfred won't take")
+        sync.enqueue("A fine thought")
+        responses += refuse()
         responses += accept()
 
         val outcome = sync.flush()
 
         assertEquals(1, outcome.delivered)
-        assertEquals(1, outcome.conflicted)
+        assertEquals(1, outcome.refused)
         assertEquals(0, outcome.remaining)
         assertFalse(sync.hasPending())
         val kept = dao.observeAllOnce()
         assertEquals(1, kept.size)
         assertTrue(kept.single().failed)
-        assertEquals(fitness, kept.single().listId)
+        assertEquals("Something Alfred won't take", kept.single().text)
     }
 
     @Test
-    fun `dismissing failed entries clears only that list's notice`() = runBlocking {
-        sync.enqueue(fitness, ShoppingVerb.TICK, "Long gone", "- [ ] Long gone")
-        sync.enqueue(fashion, ShoppingVerb.TICK, "Also gone", "- [ ] Also gone")
-        responses += staleTarget()
-        responses += staleTarget()
+    fun `dismissing clears the refused captures' notice`() = runBlocking {
+        sync.enqueue("Refused")
+        responses += refuse()
         sync.flush()
-        assertEquals(2, dao.observeAllOnce().size)
+        assertEquals(1, dao.observeAllOnce().size)
 
-        sync.dismissFailed(fitness)
+        sync.dismissFailed()
 
-        val remaining = dao.observeAllOnce()
-        assertEquals(1, remaining.size)
-        assertEquals(fashion, remaining.single().listId)
+        assertTrue(dao.observeAllOnce().isEmpty())
     }
 
     @Test
-    fun `an entry with an unknown verb is failed, not fatal, and the rest continue`() = runBlocking {
-        dao.insert(
-            PendingShoppingWrite(
-                listId = fitness, verb = "TELEPORT", text = "From a newer build", line = null, createdAt = 0L
-            )
-        )
-        sync.enqueue(fitness, ShoppingVerb.ADD, "Dip bars")
+    fun `a multi-line capture survives the round trip intact`() = runBlocking {
+        sync.enqueue("Line one\nLine two\n\nLine four")
         responses += accept()
 
-        val outcome = sync.flush()
+        sync.flush()
 
-        assertEquals(1, outcome.delivered)
-        assertEquals(1, outcome.conflicted)
-        assertEquals(listOf("$fitness:ADD:Dip bars"), writesSeen)
+        assertEquals(listOf("Line one\nLine two\n\nLine four"), capturesSeen)
     }
 }
 
 /** One-shot read of the full table, for asserting on kept/failed rows. */
-private suspend fun PendingShoppingWriteDao.observeAllOnce(): List<PendingShoppingWrite> =
+private suspend fun PendingInboxWriteDao.observeAllOnce(): List<PendingInboxWrite> =
     observeAll().first()
+
+/** Buffers a request body back into the text it carries. */
+private fun RequestBody.readText(): String = Buffer().also { writeTo(it) }.readUtf8()

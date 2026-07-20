@@ -1,11 +1,13 @@
 package com.personalmorningalarm.data.remote
 
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
+import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.model.ShoppingItemDto
 import com.personalmorningalarm.data.model.ShoppingListDetailDto
 import com.personalmorningalarm.data.model.ShoppingListSummaryDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -86,6 +88,19 @@ interface AlfredApiService {
         @Path("listId") listId: String,
         @Body body: ShoppingLineRequest
     ): Response<Unit>
+
+    /** The vault's current `0-inbox/` captures, newest first. Read-only — triage happens in the vault. */
+    @GET("inbox")
+    suspend fun getInbox(): List<InboxCaptureDto>
+
+    /**
+     * Creates a new inbox capture. The body is the text itself as text/plain, not
+     * JSON — hence the raw [RequestBody]: Gson would serialise a String to a quoted
+     * JSON scalar and send it as application/json, which this endpoint doesn't take.
+     * Build it with [AlfredRepository.capturePlainText].
+     */
+    @POST("inbox")
+    suspend fun capture(@Body body: RequestBody): Response<Unit>
 }
 
 /** Body for POST /chalkboard — the task text alone; Alfred adds the checkbox and date. */

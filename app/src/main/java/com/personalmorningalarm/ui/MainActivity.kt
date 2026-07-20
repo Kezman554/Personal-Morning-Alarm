@@ -13,6 +13,7 @@ import androidx.navigation.ui.setupWithNavController
 import com.personalmorningalarm.data.AlarmRepository
 import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.remote.ChalkboardSync
+import com.personalmorningalarm.data.remote.InboxSync
 import com.personalmorningalarm.data.remote.ShoppingSync
 import com.personalmorningalarm.databinding.ActivityMainBinding
 import com.personalmorningalarm.util.AlarmScheduler
@@ -66,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         override fun onAvailable(network: Network) {
             flushChalkboardQueue("network available")
             flushShoppingQueue("network available")
+            flushInboxQueue("network available")
         }
     }
 
@@ -80,6 +82,7 @@ class MainActivity : AppCompatActivity() {
         // long as we stay foregrounded.
         flushChalkboardQueue("app foreground")
         flushShoppingQueue("app foreground")
+        flushInboxQueue("app foreground")
         getSystemService<ConnectivityManager>()?.registerDefaultNetworkCallback(networkCallback)
     }
 
@@ -130,6 +133,25 @@ class MainActivity : AppCompatActivity() {
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Shopping queue flush failed ($trigger)", e)
+            }
+        }
+    }
+
+    /** Same trigger shape again, for the inbox capture queue. */
+    private fun flushInboxQueue(trigger: String) {
+        val appContext = applicationContext
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val sync = InboxSync.getInstance(appContext)
+                if (!sync.hasPending()) return@launch
+                val outcome = sync.flush()
+                Log.d(
+                    TAG,
+                    "Inbox queue flush ($trigger): ${outcome.delivered} delivered, " +
+                        "${outcome.refused} refused, ${outcome.remaining} remaining"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Inbox queue flush failed ($trigger)", e)
             }
         }
     }

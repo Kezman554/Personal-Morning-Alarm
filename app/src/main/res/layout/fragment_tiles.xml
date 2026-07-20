@@ -60,7 +60,7 @@
 
         </LinearLayout>
 
-        <!-- Kanban (coming soon), alone — a spacer keeps it half-width like the rest. -->
+        <!-- Inbox (live) + Kanban (coming soon) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -68,16 +68,19 @@
             android:orientation="horizontal">
 
             <include
-                android:id="@+id/tile_kanban"
+                android:id="@+id/tile_inbox"
                 layout="@layout/item_tile"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1" />
 
-            <View
+            <include
+                android:id="@+id/tile_kanban"
+                layout="@layout/item_tile"
                 android:layout_width="0dp"
-                android:layout_height="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1" />
 
         </LinearLayout>

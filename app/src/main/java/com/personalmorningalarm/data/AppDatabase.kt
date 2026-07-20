@@ -13,6 +13,7 @@ import com.personalmorningalarm.data.dao.BundledQuoteDao
 import com.personalmorningalarm.data.dao.ContentToggleDao
 import com.personalmorningalarm.data.dao.NfcTagDao
 import com.personalmorningalarm.data.dao.PendingChalkboardWriteDao
+import com.personalmorningalarm.data.dao.PendingInboxWriteDao
 import com.personalmorningalarm.data.dao.PendingShoppingWriteDao
 import com.personalmorningalarm.data.dao.StretchExerciseDao
 import com.personalmorningalarm.data.dao.StretchRoutineDao
@@ -22,6 +23,7 @@ import com.personalmorningalarm.data.entity.BundledQuote
 import com.personalmorningalarm.data.entity.ContentToggle
 import com.personalmorningalarm.data.entity.NfcTag
 import com.personalmorningalarm.data.entity.PendingChalkboardWrite
+import com.personalmorningalarm.data.entity.PendingInboxWrite
 import com.personalmorningalarm.data.entity.PendingShoppingWrite
 import com.personalmorningalarm.data.entity.StretchExercise
 import com.personalmorningalarm.data.entity.StretchRoutine
@@ -36,9 +38,10 @@ import com.personalmorningalarm.data.entity.StretchRoutine
         StretchRoutine::class,
         StretchExercise::class,
         PendingChalkboardWrite::class,
-        PendingShoppingWrite::class
+        PendingShoppingWrite::class,
+        PendingInboxWrite::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -53,6 +56,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun stretchExerciseDao(): StretchExerciseDao
     abstract fun pendingChalkboardWriteDao(): PendingChalkboardWriteDao
     abstract fun pendingShoppingWriteDao(): PendingShoppingWriteDao
+    abstract fun pendingInboxWriteDao(): PendingInboxWriteDao
 
     companion object {
         private const val DB_NAME = "personal_morning_alarm.db"
@@ -144,6 +148,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v8: offline store-and-forward queue for inbox captures. Non-destructive;
+        // no listId or line — a capture creates a file rather than targeting one.
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pending_inbox_writes` " +
+                        "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `failed` INTEGER NOT NULL)"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -154,7 +170,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DB_NAME
                 ).addMigrations(
-                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                    MIGRATION_6_7, MIGRATION_7_8
                 )
                     .build().also { INSTANCE = it }
             }
