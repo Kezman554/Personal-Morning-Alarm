@@ -1220,9 +1220,27 @@
     AlfredRepositoryTest, covering the plain-text body, FIFO replay, the
     unreachable-stops-the-flush contract, and 4xx-refused vs 5xx-retryable.
     Full suite green.
-  - NOT YET VERIFIED ON DEVICE: installDebug succeeded on the A32, then the
-    phone dropped off USB before the live test could run (it was also on the
-    secure lock screen). Still to do, once it's reconnected: send a capture and
-    confirm it lands in 0-inbox/; svc wifi disable, capture again, confirm the
-    pending marker; svc wifi enable, confirm the flush — the same three checks
-    Y5 and Y6 used.
+  - VERIFIED ON DEVICE (A32, same three checks Y5 and Y6 used): tile opens to
+    all 6 existing captures, newest first, matching the vault's own order, with
+    filenames parsed into titles + captured-at stamps. Online capture -> landed
+    as 2026-07-20-1241-dailysync-inbox-tile-test-1.md, content exact, Alfred
+    slugifying the filename from the text; the open screen reconciled in place
+    (new row appeared without a manual refresh). svc wifi disable -> capture
+    showed "Saved copy — Alfred unreachable", "1 capture waiting to sync" and a
+    "Waiting to sync" row above the vault rows; this exercised the more
+    interesting of the two offline paths — a direct write that finds Alfred just
+    gone (state was still Fresh from the earlier fetch) rather than a pre-known
+    offline. svc wifi enable -> MainActivity's network-callback trigger fired
+    within ~25s, logged "1 delivered, 0 refused, 0 remaining", vault confirmed
+    via GET, screen reconciled in place with the markers cleared.
+  - Test-harness gotcha worth recording: the second capture reached the vault as
+    "T666DailySync inbox tile test 2 ...". The app did not add that prefix — the
+    vault content is byte-for-byte what was in the field, so the text passed
+    through faithfully. The T666 was injected before typing, almost certainly by
+    adb scroll swipes gliding across a still-open Samsung keyboard (swipe-type)
+    while the compose field held focus. Dismiss the keyboard before scrolling
+    when driving this screen by adb.
+  - Left two test captures in the vault for Nick to triage away, both clearly
+    labelled: 2026-07-20-1241-dailysync-inbox-tile-test-1.md and
+    2026-07-20-1245-t666dailysync-inbox-tile-test-2.md. No DELETE endpoint
+    exists on /inbox, same as the shopping-list create artifacts.
