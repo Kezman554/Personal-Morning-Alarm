@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PersonalMorningAlarm"
+rootProject.name = "DailySync"
 include ':app'

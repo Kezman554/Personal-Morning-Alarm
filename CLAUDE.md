@@ -1,4 +1,4 @@
-Claude · MDCopyProject: Personal Morning Alarm
+Claude · MDCopyProject: DailySync
 An Android personal-organizer app that opens on a tile home screen aggregating other
 tools (Daily Schedule, Rolling To-Do, with KitchenSync and Kanban to come), and also
 features a robust two-stage wake-up alarm with NFC checkpoints and toggleable content
@@ -15,6 +15,15 @@ app/src/main/java/com/personalmorningalarm/challenge/ - Shake, NFC, math, typing
 app/src/main/java/com/personalmorningalarm/util/ - Helpers, constants
 app/src/main/res/ - Layouts, strings, drawables, themes
 docs/ - PRD and progress log
+
+Naming: the project has been Personal Morning Alarm, then MorningSync, and is now
+DailySync (repo folder C:\Dev\DailySync, remote Kezman554/DailySync, app_name
+"DailySync"). The Kotlin package and applicationId remain com.personalmorningalarm
+and are deliberately NOT renamed: applicationId is the app's identity to Android, so
+changing it makes the A32 treat the build as a different app — a fresh install with
+an empty data directory, losing registered NFC tags and alarm history exactly as the
+2026-07-16 incident below did. Treat com.personalmorningalarm as a legacy internal
+identifier; only user-facing names say DailySync.
 
 Commands
 

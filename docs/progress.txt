@@ -1311,3 +1311,22 @@
     flaked 4 SettingsViewModelTest cases. Those ViewModel tests await state on the
     WALL CLOCK (see the 5 Jul harness note), so the install running alongside them
     starves the awaits. Re-run alone: 251/251 green. Don't combine the two tasks
+
+2026-07-23  Rename: MorningSync -> DailySync (docs and project metadata)
+  - The repo folder is now C:\Dev\DailySync and the GitHub remote is
+    Kezman554/DailySync. The project has been Personal Morning Alarm, then
+    MorningSync, now DailySync; earlier entries in this log keep their original
+    wording (they are a record of what was true at the time)
+  - CLAUDE.md: title is now "Project: DailySync", plus a new Naming section
+    recording the three names and why the package stays put
+  - docs/wake-up-alarm_PRD.md: title is now "DailySync - Product Requirements
+    Document", with the former names noted underneath
+  - settings.gradle: rootProject.name "PersonalMorningAlarm" -> "DailySync"
+    (build/IDE display name only; no effect on the installed app)
+  - git remote origin repointed to the DailySync URL
+  - NOT renamed, deliberately: the Kotlin package and applicationId
+    com.personalmorningalarm. applicationId is the app's identity to Android, so
+    changing it would make the A32 see a different app entirely — fresh install,
+    empty data directory, NFC tags and alarm history gone, the same loss as
+    2026-07-16. res/values/strings.xml app_name was already "DailySync", so the
+    launcher and every user-facing surface already read correctly

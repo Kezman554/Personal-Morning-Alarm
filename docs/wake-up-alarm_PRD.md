@@ -1,4 +1,5 @@
-Wake up alarm prd · MDCopyPersonal Morning Alarm - Product Requirements Document
+Wake up alarm prd · MDCopyDailySync - Product Requirements Document
+(formerly Personal Morning Alarm, then MorningSync)
 Version: 2.0
 Last Updated: July 2026
 Overview
