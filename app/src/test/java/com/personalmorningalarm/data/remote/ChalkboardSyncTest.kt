@@ -7,6 +7,7 @@ import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.dao.PendingChalkboardWriteDao
 import com.personalmorningalarm.data.entity.ChalkboardVerb
 import com.personalmorningalarm.data.entity.PendingChalkboardWrite
+import com.personalmorningalarm.data.model.CalendarEventsDto
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
@@ -52,6 +53,8 @@ class ChalkboardSyncTest {
             object : AlfredApiService {
                 override suspend fun getDailySchedule(): List<ScheduleTaskDto> = throw IOException()
                 override suspend fun getWeekSchedule(): WeekScheduleDto = throw IOException()
+                override suspend fun getCalendarEvents(start: String, end: String): CalendarEventsDto =
+                    throw IOException()
                 override suspend fun getChalkboard(): List<ChalkboardTaskDto> = throw IOException()
 
                 override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> =

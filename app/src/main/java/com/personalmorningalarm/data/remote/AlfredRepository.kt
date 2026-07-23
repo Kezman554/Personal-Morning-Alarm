@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.personalmorningalarm.data.model.CalendarEventsDto
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
@@ -18,6 +19,7 @@ import okhttp3.MediaType
 import okhttp3.RequestBody
 import retrofit2.Response
 import java.lang.reflect.Type
+import java.time.LocalDate
 
 /**
  * Single entry point to the Alfred Vault API. Every endpoint goes through [fetch],
@@ -53,6 +55,34 @@ class AlfredRepository(
             endpoint = ENDPOINT_WEEK_SCHEDULE,
             type = WeekScheduleDto::class.java
         ) { it.getWeekSchedule() }
+
+    /**
+     * The family calendar for the whole visible week — one call, bucketed by day
+     * client-side. [endExclusive] follows the endpoint: pass the day after the last
+     * day you want.
+     */
+    suspend fun getCalendarWeek(start: LocalDate, endExclusive: LocalDate): AlfredResult<CalendarEventsDto> =
+        fetchCalendar(ENDPOINT_CALENDAR_WEEK, start, endExclusive)
+
+    /**
+     * Just [date]'s family calendar, for the alarm's wake-up schedule page.
+     *
+     * Cached under its own key rather than the week's: the two surfaces ask for
+     * different ranges, and a narrow morning fetch must not overwrite the week the
+     * tile falls back on when Alfred is unreachable.
+     */
+    suspend fun getCalendarDay(date: LocalDate): AlfredResult<CalendarEventsDto> =
+        fetchCalendar(ENDPOINT_CALENDAR_DAY, date, date.plusDays(1))
+
+    private suspend fun fetchCalendar(
+        endpoint: String,
+        start: LocalDate,
+        endExclusive: LocalDate
+    ): AlfredResult<CalendarEventsDto> =
+        fetch(
+            endpoint = endpoint,
+            type = CalendarEventsDto::class.java
+        ) { it.getCalendarEvents(start.toString(), endExclusive.toString()) }
 
     /** The rolling to-do from Alfred, falling back to the last one it served. */
     suspend fun getChalkboard(): AlfredResult<List<ChalkboardTaskDto>> =
@@ -313,6 +343,11 @@ class AlfredRepository(
         const val ENDPOINT_DAILY_SCHEDULE = "daily-schedule"
         const val ENDPOINT_WEEK_SCHEDULE = "daily-schedule/week"
         const val ENDPOINT_CHALKBOARD = "chalkboard"
+
+        /** Both hit GET /calendar/events; they cache apart because their ranges differ. */
+        const val ENDPOINT_CALENDAR_WEEK = "calendar/events/week"
+        const val ENDPOINT_CALENDAR_DAY = "calendar/events/day"
+
         const val ENDPOINT_SHOPPING = "shopping"
         const val ENDPOINT_INBOX = "inbox"
 

@@ -1244,3 +1244,70 @@
     labelled: 2026-07-20-1241-dailysync-inbox-tile-test-1.md and
     2026-07-20-1245-t666dailysync-inbox-tile-test-2.md. No DELETE endpoint
     exists on /inbox, same as the shopping-list create artifacts.
+
+2026-07-23  Family calendar on the schedule (Y4/AE, Alfred GET /calendar/events)
+  - The household diary (the "Young Family" Google Calendar, read through Home
+    Assistant) now shows alongside Nick's vault plan on BOTH schedule surfaces:
+    the Daily Schedule tile's week pager and the Stage 2 wake-up schedule page.
+    Read-only — creating/updating events is a later card
+  - API probed live before coding (per memory rule). Confirmed against the Pi:
+    GET /calendar/events?start=&end= returns {calendar, events:[{summary, start,
+    end, all_day, location, description}]}. BOTH the query `end` AND an all-day
+    event's `end` are EXCLUSIVE (Google's convention) — the live France event is
+    start 2026-07-24, end 2026-07-25, all_day true, i.e. one day. The card's
+    "?end=<weekEnd+1d>" matches the query contract exactly
+  - SHARED LAYER (the card's "build once"): data/model/FamilyCalendar — pure
+    byDate() bucketing (one week fetched in ONE call, split client-side, never a
+    request per day) plus agenda(), which merges a day's vault blocks with its
+    events. Both surfaces render through it and through one ScheduleRenderer
+  - THE MERGE, and the one place the card's wording meets reality: vault schedule
+    blocks carry a period ("am"/"pm"/none — usually none), never a clock time, so
+    there is no vault timeline to interleave against. A timed event is therefore
+    placed in the period its start falls in (<12:00 Morning, <18:00 Afternoon,
+    else Evening) and sorts by time against the other events there; the untimed
+    vault blocks keep Alfred's order beneath them. That is "interleaved" at the
+    finest granularity the vault data actually supports
+  - All-day events belong to no period, so they banner the top of the day with no
+    time (DayAgenda.allDay), which is exactly what France needs
+  - VISUAL: calendar rows carry a "▌" colour band + HH:mm and are colour-marked
+    (ForegroundColorSpan); vault rows keep their "•" bullet, uncoloured. Colour is
+    passed in per surface like ChalkboardRenderer's dateColor — the alarm panel is
+    white-on-blue (amber 0xFFFFD180), the tile follows the theme (colorPrimary).
+    Calendar summaries are Google text, not vault text, so they deliberately do
+    NOT go through VaultText — no markdown/wikilink resolution to apply
+  - THE WAKE PAGE NEVER BREAKS: the alarm renders the vault schedule first and
+    layers the calendar in as a SECOND pass, guarded by the existing gap check and
+    wrapped in its own try/catch. A calendar that is slow, unreachable or
+    malformed is simply absent. Malformed input is absent everywhere, in fact —
+    FamilyCalendar drops unparseable dates and untitled events rather than throwing
+  - CACHING: inherits the Y5 fetch() pattern free (cache on success, serve cache
+    when unreachable, Unavailable only with nothing cached). TWO cache keys, not
+    one: calendar/events/week and calendar/events/day. The alarm's narrow one-day
+    fetch must not overwrite the week the tile falls back on in France — a test
+    pins that. Stale calendar shows a subtle "Family calendar as of 24 Jul, 08:12"
+    note, suppressed when the plan's louder "Alfred unreachable" note is already up
+  - 251 unit tests green (was 221): FamilyCalendarTest (exclusive end incl. the
+    real France shape, multi-day spans, absurd-range guard, date-only-without-flag,
+    offset and offsetless timed parsing, per-day ordering, malformed-is-absent,
+    and the period merge), 5 renderer tests (banner, timed row, colour marking,
+    summaries-shown-as-sent, and byte-identical output when no calendar), 6
+    repository tests (ranges actually sent, fallback, cache independence)
+
+2026-07-23  Follow-up: "calendar missing from the wake page" — not a bug
+  - Nick saw the France banner on the Daily Schedule tile but not on the Stage 2
+    wake-up schedule page. Diagnosed from logs + the API rather than by theorising:
+    the 15:27 Stage 2 run logged "Daily schedule: 1 groups, 3 tasks" with no
+    "layered" line, and GET /calendar/events?start=2026-07-23&end=2026-07-24
+    returns []. There are simply no family events TODAY — the only one is France
+    on the 24th. The tile is a week view (the 24th is one swipe away); the wake
+    page is today-only by design, per the card
+  - Proof the fetch really ran rather than failing quietly: a failure logs
+    "Alfred unreachable for calendar/events/day" and no such line appeared
+  - FIXED THE REAL PROBLEM, which was diagnosability: "nothing on today" and "the
+    calendar broke" rendered identically and logged identically (both silent).
+    The empty case now logs "Family calendar: nothing on today — vault schedule
+    shown alone". The 24th's alarm is the natural end-to-end proof
+  - HARNESS GOTCHA: `gradlew testDebugUnitTest installDebug` in one invocation
+    flaked 4 SettingsViewModelTest cases. Those ViewModel tests await state on the
+    WALL CLOCK (see the 5 Jul harness note), so the install running alongside them
+    starves the awaits. Re-run alone: 251/251 green. Don't combine the two tasks

@@ -36,7 +36,8 @@ import com.personalmorningalarm.data.entity.AlarmEvent
 import com.personalmorningalarm.data.entity.StretchExercise
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ContentType
-import com.personalmorningalarm.data.model.DailySchedule
+import com.personalmorningalarm.data.model.FamilyCalendar
+import com.personalmorningalarm.data.model.FamilyEvent
 import com.personalmorningalarm.data.model.MorningGoal
 import com.personalmorningalarm.data.model.RollingTodo
 import com.personalmorningalarm.data.model.ScheduleTaskDto
@@ -45,6 +46,7 @@ import com.personalmorningalarm.data.remote.AlfredResult
 import com.personalmorningalarm.databinding.ActivityAlarmDismissalBinding
 import com.personalmorningalarm.service.AlarmService
 import com.personalmorningalarm.service.CountdownService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.ceil
@@ -478,10 +480,55 @@ class AlarmDismissalActivity : AppCompatActivity() {
                 return@launch
             }
             renderSchedule(result)
+            layerFamilyCalendar(result, gap)
         }
     }
 
-    private fun renderSchedule(result: AlfredResult<List<ScheduleTaskDto>>) {
+    /**
+     * Adds today's family calendar to the schedule already on screen. Deliberately
+     * a second pass: the vault plan is rendered before this runs and stands on its
+     * own, so a calendar that is slow, unreachable or malformed simply doesn't
+     * appear. The wake screen must render either way.
+     */
+    private suspend fun layerFamilyCalendar(
+        schedule: AlfredResult<List<ScheduleTaskDto>>,
+        gap: Int
+    ) {
+        val events = try {
+            val result = alfredRepository.getCalendarDay(LocalDate.now())
+            FamilyCalendar.byDate(
+                when (result) {
+                    is AlfredResult.Fresh -> result.data
+                    is AlfredResult.Stale -> result.data
+                    AlfredResult.Unavailable -> null
+                }
+            )[LocalDate.now()].orEmpty()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            // Belt and braces: the repository doesn't throw, and this screen must
+            // not become the first place that matters.
+            Log.w(TAG, "Family calendar failed — showing the vault schedule alone", e)
+            emptyList()
+        }
+        if (events.isEmpty()) {
+            // Logged explicitly: "nothing on today" and "the calendar broke" look
+            // identical on screen, and only the log can tell them apart afterwards.
+            Log.d(TAG, "Family calendar: nothing on today — vault schedule shown alone")
+            return
+        }
+        if (!showingContent || gapsShown != gap) {
+            Log.d(TAG, "Family calendar arrived after the screen moved on — dropped")
+            return
+        }
+        renderSchedule(schedule, events)
+        Log.d(TAG, "Family calendar: ${events.size} events layered onto today's schedule")
+    }
+
+    private fun renderSchedule(
+        result: AlfredResult<List<ScheduleTaskDto>>,
+        events: List<FamilyEvent> = emptyList()
+    ) {
         if (result is AlfredResult.Stale) {
             binding.contentNote.visibility = View.VISIBLE
             binding.contentNote.text = getString(R.string.schedule_stale)
@@ -492,20 +539,24 @@ class AlarmDismissalActivity : AppCompatActivity() {
             is AlfredResult.Stale -> result.data
             AlfredResult.Unavailable -> {
                 Log.d(TAG, "Daily schedule: Alfred unreachable and nothing cached")
-                binding.contentBody.text = getString(R.string.schedule_unavailable)
-                return
+                // The calendar can still carry the morning on its own.
+                if (events.isEmpty()) {
+                    binding.contentBody.text = getString(R.string.schedule_unavailable)
+                    return
+                }
+                emptyList()
             }
         }
 
-        val groups = DailySchedule.group(tasks)
-        if (groups.isEmpty()) {
+        val agenda = FamilyCalendar.agenda(tasks, events)
+        if (agenda.isEmpty) {
             binding.contentBody.text = getString(R.string.schedule_empty)
             return
         }
         binding.contentBody.visibility = View.GONE
         binding.contentListScroll.visibility = View.VISIBLE
-        binding.tvContentList.text = ScheduleRenderer.format(this, groups)
-        Log.d(TAG, "Daily schedule: ${groups.size} groups, ${tasks.size} tasks (stale=${result is AlfredResult.Stale})")
+        binding.tvContentList.text = ScheduleRenderer.format(this, agenda, COLOR_CALENDAR)
+        Log.d(TAG, "Daily schedule: ${agenda.groups.size} groups, ${tasks.size} tasks (stale=${result is AlfredResult.Stale})")
     }
 
     /**
@@ -735,6 +786,9 @@ class AlarmDismissalActivity : AppCompatActivity() {
 
         /** Secondary text on the content panel's white-on-blue (e.g. to-do dates). */
         private const val COLOR_FAINT = 0xB3FFFFFF.toInt()
+
+        /** Marks family-calendar rows on the Stage 2 panel's blue, where white is the plan. */
+        private const val COLOR_CALENDAR = 0xFFFFD180.toInt()
 
         private const val COLOR_RED = 0xFFD32F2F.toInt()
         private const val COLOR_GREEN = 0xFF388E3C.toInt()

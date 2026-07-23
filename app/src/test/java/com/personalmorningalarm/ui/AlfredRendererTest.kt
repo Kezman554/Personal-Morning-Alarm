@@ -9,6 +9,8 @@ import android.text.style.StyleSpan
 import androidx.test.core.app.ApplicationProvider
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.DailySchedule
+import com.personalmorningalarm.data.model.FamilyCalendar
+import com.personalmorningalarm.data.model.FamilyEvent
 import com.personalmorningalarm.data.model.RollingTodo
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import org.junit.Assert.assertEquals
@@ -17,6 +19,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * The rendering shared by the Stage 2 content screens and the Today screen, so the
@@ -63,6 +67,72 @@ class AlfredRendererTest {
         assertEquals("Morning\n• Gym with Sam", text)
         assertFalse(text.contains("*"))
         assertFalse(text.contains("["))
+    }
+
+    // --- family calendar layered onto the schedule ---
+
+    private fun familyEvent(summary: String, time: LocalTime?) =
+        FamilyEvent(summary, LocalDate.parse("2026-07-24"), time, allDay = time == null)
+
+    @Test
+    fun `an all-day event banners the day with no time, above the periods`() {
+        val agenda = FamilyCalendar.agenda(
+            listOf(ScheduleTaskDto("A33 loop", null)),
+            listOf(familyEvent("France", null))
+        )
+
+        val text = ScheduleRenderer.format(context, agenda, Color.RED).toString()
+
+        assertEquals("▌ France\n\nAnytime\n• A33 loop", text)
+    }
+
+    @Test
+    fun `a timed event renders with its start time, interleaved into its period`() {
+        val agenda = FamilyCalendar.agenda(
+            listOf(ScheduleTaskDto("Weigh-in", "am")),
+            listOf(familyEvent("Early shift", LocalTime.of(7, 30)))
+        )
+
+        val text = ScheduleRenderer.format(context, agenda, Color.RED).toString()
+
+        assertEquals("Morning\n▌ 07:30  Early shift\n• Weigh-in", text)
+    }
+
+    @Test
+    fun `calendar rows are colour-marked and vault rows are not`() {
+        val agenda = FamilyCalendar.agenda(
+            listOf(ScheduleTaskDto("Weigh-in", "am")),
+            listOf(familyEvent("Early shift", LocalTime.of(7, 30)))
+        )
+
+        val rendered = ScheduleRenderer.format(context, agenda, Color.RED)
+        val text = rendered.toString()
+        val spanned = rendered as Spanned
+        val marked = spanned.getSpans(0, rendered.length, ForegroundColorSpan::class.java)
+            .map { text.substring(spanned.getSpanStart(it), spanned.getSpanEnd(it)) }
+
+        assertEquals(listOf("▌ 07:30  Early shift"), marked)
+    }
+
+    @Test
+    fun `a calendar summary is shown as sent — it is not vault markup`() {
+        // Google summaries aren't vault text, so ** and [[ ]] would be literal.
+        val agenda = FamilyCalendar.agenda(emptyList(), listOf(familyEvent("Pilates **class**", LocalTime.of(9, 0))))
+
+        val text = ScheduleRenderer.format(context, agenda, Color.RED).toString()
+
+        assertTrue(text.contains("Pilates **class**"))
+    }
+
+    @Test
+    fun `a schedule with no calendar renders exactly as it did before`() {
+        val groups = DailySchedule.group(listOf(ScheduleTaskDto("Gym", "am")))
+        val agenda = FamilyCalendar.agenda(listOf(ScheduleTaskDto("Gym", "am")), emptyList())
+
+        assertEquals(
+            ScheduleRenderer.format(context, groups).toString(),
+            ScheduleRenderer.format(context, agenda, Color.RED).toString()
+        )
     }
 
     @Test

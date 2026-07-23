@@ -7,6 +7,7 @@ import com.personalmorningalarm.data.AppDatabase
 import com.personalmorningalarm.data.dao.PendingShoppingWriteDao
 import com.personalmorningalarm.data.entity.PendingShoppingWrite
 import com.personalmorningalarm.data.entity.ShoppingVerb
+import com.personalmorningalarm.data.model.CalendarEventsDto
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
@@ -56,6 +57,8 @@ class ShoppingSyncTest {
             object : AlfredApiService {
                 override suspend fun getDailySchedule(): List<ScheduleTaskDto> = throw IOException()
                 override suspend fun getWeekSchedule(): WeekScheduleDto = throw IOException()
+                override suspend fun getCalendarEvents(start: String, end: String): CalendarEventsDto =
+                    throw IOException()
                 override suspend fun getChalkboard(): List<ChalkboardTaskDto> = throw IOException()
                 override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> = throw IOException()
                 override suspend fun tickChalkboardItem(body: ChalkboardLineRequest): Response<Unit> = throw IOException()

@@ -17,7 +17,11 @@ import com.personalmorningalarm.data.remote.AlfredRepository
 import com.personalmorningalarm.data.remote.AlfredResult
 import com.personalmorningalarm.databinding.FragmentWeekScheduleBinding
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * The Daily Schedule tile's screen: the whole plan week, one swipeable page per
@@ -61,6 +65,9 @@ class WeekScheduleFragment : Fragment() {
 
     private fun render(state: WeekScheduleViewModel.WeekState) {
         binding.tvWeekNote.isVisible = false
+        // The calendar is layered onto whatever the plan renders — it is never the
+        // reason a week fails to show.
+        dayAdapter.setEvents(state.eventsByDate)
         when (val result = state.week) {
             null -> showStatus(R.string.schedule_loading)
             AlfredResult.Unavailable -> showStatus(R.string.schedule_unavailable)
@@ -71,7 +78,22 @@ class WeekScheduleFragment : Fragment() {
                 showWeek(result.data)
             }
         }
+        showCalendarNote(state)
     }
+
+    /**
+     * A saved calendar says so quietly. The plan's own "Alfred unreachable" note
+     * wins when both are stale — it already says the same thing, louder.
+     */
+    private fun showCalendarNote(state: WeekScheduleViewModel.WeekState) {
+        if (binding.tvWeekNote.isVisible) return
+        val cachedAt = state.calendarCachedAtMillis ?: return
+        binding.tvWeekNote.isVisible = true
+        binding.tvWeekNote.text = getString(R.string.calendar_stale, formatAsOf(cachedAt))
+    }
+
+    private fun formatAsOf(millis: Long): String =
+        AS_OF_FORMAT.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()))
 
     private fun showWeek(dto: WeekScheduleDto) {
         val today = LocalDate.now()
@@ -98,5 +120,10 @@ class WeekScheduleFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    private companion object {
+        val AS_OF_FORMAT: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.getDefault())
     }
 }

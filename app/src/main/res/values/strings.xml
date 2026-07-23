@@ -66,6 +66,7 @@
     <string name="schedule_unavailable">Schedule unavailable</string>
     <string name="schedule_empty">Nothing scheduled today</string>
     <string name="schedule_stale">Saved copy — Alfred unreachable</string>
+    <string name="calendar_stale">Family calendar as of %1$s</string>
     <string name="schedule_period_morning">Morning</string>
     <string name="schedule_period_afternoon">Afternoon</string>
     <string name="schedule_period_evening">Evening</string>

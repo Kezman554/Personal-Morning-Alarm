@@ -3,6 +3,7 @@ package com.personalmorningalarm.ui
 import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
 import com.personalmorningalarm.data.entity.ChalkboardVerb
+import com.personalmorningalarm.data.model.CalendarEventsDto
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
 import com.personalmorningalarm.data.model.WeekScheduleDto
@@ -67,6 +68,9 @@ class TodayViewModelTest : ViewModelTestSupport() {
 
                     // The Today screen never asks for the week — see the week-screen tests.
                     override suspend fun getWeekSchedule(): WeekScheduleDto =
+                        throw IOException("Alfred unreachable")
+
+                    override suspend fun getCalendarEvents(start: String, end: String): CalendarEventsDto =
                         throw IOException("Alfred unreachable")
 
                     override suspend fun addChalkboardItem(body: ChalkboardAddRequest): Response<Unit> = write()

@@ -1,5 +1,6 @@
 package com.personalmorningalarm.data.remote
 
+import com.personalmorningalarm.data.model.CalendarEventsDto
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
@@ -13,6 +14,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * The Alfred Vault API. One endpoint per content screen that reads from Alfred;
@@ -35,6 +37,19 @@ interface AlfredApiService {
      */
     @GET("daily-schedule/week")
     suspend fun getWeekSchedule(): WeekScheduleDto
+
+    /**
+     * The family calendar between [start] (inclusive) and [end] (exclusive), both
+     * plain ISO dates. One call covers a whole visible week — callers bucket the
+     * events by day themselves rather than asking per day.
+     *
+     * Read-only: the app never writes to the household diary.
+     */
+    @GET("calendar/events")
+    suspend fun getCalendarEvents(
+        @Query("start") start: String,
+        @Query("end") end: String
+    ): CalendarEventsDto
 
     /**
      * The rolling to-do, including items ticked but not yet swept by the Pi's

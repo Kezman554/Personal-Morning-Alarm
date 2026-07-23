@@ -2,6 +2,8 @@ package com.personalmorningalarm.data.remote
 
 import androidx.test.core.app.ApplicationProvider
 import com.google.gson.Gson
+import com.personalmorningalarm.data.model.CalendarEventDto
+import com.personalmorningalarm.data.model.CalendarEventsDto
 import com.personalmorningalarm.data.model.ChalkboardTaskDto
 import com.personalmorningalarm.data.model.InboxCaptureDto
 import com.personalmorningalarm.data.model.ScheduleTaskDto
@@ -20,6 +22,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import retrofit2.Response
 import java.io.IOException
+import java.time.LocalDate
 
 /**
  * The cache-and-fallback behaviour every Alfred screen leans on: Alfred being
@@ -32,6 +35,9 @@ class AlfredRepositoryTest {
     private val settings = AlfredSettings(context)
     private val cache = AlfredResponseCache(context)
 
+    /** The start/end actually sent to /calendar/events, so the exclusive end can be pinned. */
+    private var calendarRange: Pair<String, String>? = null
+
     /** An Alfred that answers each endpoint with the value given, or throws if null. */
     private fun repository(
         response: List<ScheduleTaskDto>? = null,
@@ -43,7 +49,8 @@ class AlfredRepositoryTest {
         createShoppingListResponse: (() -> Response<ShoppingListSummaryDto>)? = null,
         shoppingWriteResponse: (() -> Response<Unit>)? = null,
         inboxResponse: List<InboxCaptureDto>? = null,
-        captureResponse: (() -> Response<Unit>)? = null
+        captureResponse: (() -> Response<Unit>)? = null,
+        calendarResponse: CalendarEventsDto? = null
     ) = AlfredRepository(
         settings,
         cache,
@@ -54,6 +61,11 @@ class AlfredRepositoryTest {
 
                 override suspend fun getWeekSchedule(): WeekScheduleDto =
                     weekResponse ?: throw IOException("Alfred unreachable")
+
+                override suspend fun getCalendarEvents(start: String, end: String): CalendarEventsDto {
+                    calendarRange = start to end
+                    return calendarResponse ?: throw IOException("Alfred unreachable")
+                }
 
                 override suspend fun getChalkboard(): List<ChalkboardTaskDto> =
                     chalkboardResponse ?: throw IOException("Alfred unreachable")
@@ -217,6 +229,70 @@ class AlfredRepositoryTest {
         assertEquals(AlfredResult.Unavailable, repository().getDailySchedule())
         repository(response = schedule).getDailySchedule()
         assertEquals(week, (repository().getWeekSchedule() as AlfredResult.Stale).data)
+    }
+
+    // --- family calendar: one data layer, two surfaces ---
+
+    private val calendar = CalendarEventsDto(
+        calendar = "young_family",
+        events = listOf(
+            CalendarEventDto("France", "2026-07-24", "2026-07-25", true, null, null)
+        )
+    )
+
+    @Test
+    fun `calendar week returns fresh data from a reachable Alfred`() = runBlocking {
+        val result = repository(calendarResponse = calendar)
+            .getCalendarWeek(LocalDate.parse("2026-07-20"), LocalDate.parse("2026-07-26"))
+
+        assertTrue(result is AlfredResult.Fresh)
+        assertEquals(calendar, (result as AlfredResult.Fresh).data)
+    }
+
+    @Test
+    fun `calendar week asks for the range it was given, end exclusive`() = runBlocking {
+        repository(calendarResponse = calendar)
+            .getCalendarWeek(LocalDate.parse("2026-07-20"), LocalDate.parse("2026-07-26"))
+
+        assertEquals("2026-07-20" to "2026-07-26", calendarRange)
+    }
+
+    @Test
+    fun `calendar day asks for one day, ending the day after`() = runBlocking {
+        repository(calendarResponse = calendar).getCalendarDay(LocalDate.parse("2026-07-24"))
+
+        // The endpoint's end is exclusive, so a single day ends on the 25th.
+        assertEquals("2026-07-24" to "2026-07-25", calendarRange)
+    }
+
+    @Test
+    fun `calendar falls back to the last successful response`() = runBlocking {
+        repository(calendarResponse = calendar)
+            .getCalendarWeek(LocalDate.parse("2026-07-20"), LocalDate.parse("2026-07-26"))
+
+        val result = repository().getCalendarWeek(LocalDate.parse("2026-07-20"), LocalDate.parse("2026-07-26"))
+
+        assertTrue(result is AlfredResult.Stale)
+        assertEquals(calendar, (result as AlfredResult.Stale).data)
+    }
+
+    @Test
+    fun `an unreachable calendar with nothing cached is unavailable, not an error`() = runBlocking {
+        val result = repository().getCalendarDay(LocalDate.parse("2026-07-24"))
+
+        assertEquals(AlfredResult.Unavailable, result)
+    }
+
+    @Test
+    fun `the alarm's day fetch does not overwrite the week the tile falls back on`() = runBlocking {
+        repository(calendarResponse = calendar)
+            .getCalendarWeek(LocalDate.parse("2026-07-20"), LocalDate.parse("2026-07-26"))
+        // A morning fetch of one narrow day, as the wake page makes.
+        repository(calendarResponse = CalendarEventsDto("young_family", emptyList()))
+            .getCalendarDay(LocalDate.parse("2026-07-24"))
+
+        val week = repository().getCalendarWeek(LocalDate.parse("2026-07-20"), LocalDate.parse("2026-07-26"))
+        assertEquals(calendar, (week as AlfredResult.Stale).data)
     }
 
     // --- chalkboard writes: like the reads, nothing here may throw ---
